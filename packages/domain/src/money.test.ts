@@ -80,6 +80,27 @@ describe("Money: tasas en puntos base", () => {
   });
 });
 
+describe("Money: proporciones", () => {
+  it("calcula un tercio y dos tercios con redondeo half-up", () => {
+    expect(Money.fromCents(100).multiplyByRatio(1, 3).toCents()).toBe(33);
+    expect(Money.fromCents(100).multiplyByRatio(2, 3).toCents()).toBe(67);
+  });
+
+  it("redondea el empate hacia arriba", () => {
+    expect(Money.fromCents(5).multiplyByRatio(1, 2).toCents()).toBe(3);
+  });
+
+  it("mantiene el signo en montos negativos", () => {
+    expect(Money.fromCents(-100).multiplyByRatio(2, 3).toCents()).toBe(-67);
+  });
+
+  it("rechaza denominadores no positivos y valores no enteros", () => {
+    expect(() => Money.fromCents(100).multiplyByRatio(1, 0)).toThrow(InvalidMoneyError);
+    expect(() => Money.fromCents(100).multiplyByRatio(1, -2)).toThrow(InvalidMoneyError);
+    expect(() => Money.fromCents(100).multiplyByRatio(1.5, 2)).toThrow(InvalidMoneyError);
+  });
+});
+
 describe("Money: reparto en partes", () => {
   it("reparte L 100.00 en 3 partes y la última absorbe la diferencia", () => {
     const parts = Money.fromCents(10000).splitEvenly(3).map((part) => part.toCents());

@@ -84,6 +84,21 @@ export class Money {
     return new Money(toSafeCents(result));
   }
 
+  /** Multiplica por una proporción de enteros (numerador / denominador), redondeando half-up. */
+  multiplyByRatio(numerator: number, denominator: number): Money {
+    if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator)) {
+      throw new InvalidMoneyError("La proporción debe usar enteros");
+    }
+    if (denominator <= 0) {
+      throw new InvalidMoneyError("El denominador debe ser mayor que cero");
+    }
+    const result = divideRoundingHalfUp(
+      BigInt(this.cents) * BigInt(numerator),
+      BigInt(denominator),
+    );
+    return new Money(toSafeCents(result));
+  }
+
   /**
    * Reparte el monto en partes casi iguales sin perder centavos:
    * las primeras n-1 se redondean y la última absorbe la diferencia.
