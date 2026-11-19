@@ -53,8 +53,11 @@ function addMonths(isoDate: string, months: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** Primera versión: calcula el plan de cuotas con interés fijo (FLAT). */
-export function buildSchedule(terms: LoanTerms): Installment[] {
+function isValidIsoDate(isoDate: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(isoDate) && addDays(isoDate, 0) === isoDate;
+}
+
+function validateLoanTerms(terms: LoanTerms): void {
   if (!Number.isInteger(terms.installments) || terms.installments < 1) {
     throw new InvalidLoanTermsError("El número de cuotas debe ser un entero mayor o igual a 1");
   }
@@ -64,32 +67,46 @@ export function buildSchedule(terms: LoanTerms): Installment[] {
   if (!Number.isInteger(terms.rateBp) || terms.rateBp < 0) {
     throw new InvalidLoanTermsError("La tasa debe ser un entero en puntos base, sin negativos");
   }
-  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(terms.startDate);
-  if (!dateMatch || addDays(terms.startDate, 0) !== terms.startDate) {
+  if (!isValidIsoDate(terms.startDate)) {
     throw new InvalidLoanTermsError("La fecha de inicio debe tener el formato AAAA-MM-DD");
   }
+}
 
+/** Interés total con método fijo (FLAT): capital × tasa × periodos de tasa que dura el préstamo. */
+function calculateFlatInterest(terms: LoanTerms): Money {
   const weeksPerPayment = WEEKS_PER_PERIOD[terms.paymentFrequency];
   const weeksPerRatePeriod = WEEKS_PER_PERIOD[terms.ratePeriod];
-
-  const totalInterest = terms.principal.multiplyByRatio(
+  return terms.principal.multiplyByRatio(
     terms.rateBp * terms.installments * weeksPerPayment,
     BASIS_POINTS_PER_UNIT * weeksPerRatePeriod,
   );
-  const principalParts = terms.principal.splitEvenly(terms.installments);
-  const interestParts = totalInterest.splitEvenly(terms.installments);
+}
 
-  const schedule: Installment[] = [];
-  for (let number = 1; number <= terms.installments; number++) {
-    let dueDate: string;
-    if (terms.paymentFrequency === "MONTHLY") {
-      dueDate = addMonths(terms.startDate, number);
-    } else {
-      dueDate = addDays(terms.startDate, DAYS_PER_WEEK * weeksPerPayment * number);
-    }
-    const principal = principalParts[number - 1]!;
-    const interest = interestParts[number - 1]!;
-    schedule.push({ number, dueDate, principal, interest, total: principal.add(interest) });
+/** Fecha de vencimiento de la cuota indicada, contada siempre desde la fecha de inicio. */
+function calculateDueDate(terms: LoanTerms, installmentNumber: number): string {
+  if (terms.paymentFrequency === "MONTHLY") {
+    return addMonths(terms.startDate, installmentNumber);
   }
-  return schedule;
+  const daysPerPayment = DAYS_PER_WEEK * WEEKS_PER_PERIOD[terms.paymentFrequency];
+  return addDays(terms.startDate, daysPerPayment * installmentNumber);
+}
+
+/** Construye el plan de cuotas con interés fijo (FLAT). */
+export function buildSchedule(terms: LoanTerms): Installment[] {
+  validateLoanTerms(terms);
+
+  const principalParts = terms.principal.splitEvenly(terms.installments);
+  const interestParts = calculateFlatInterest(terms).splitEvenly(terms.installments);
+
+  return principalParts.map((principal, index) => {
+    const interest = interestParts[index]!;
+    const number = index + 1;
+    return {
+      number,
+      dueDate: calculateDueDate(terms, number),
+      principal,
+      interest,
+      total: principal.add(interest),
+    };
+  });
 }
