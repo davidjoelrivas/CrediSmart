@@ -1,3 +1,4 @@
+import { addDays, addMonths, isValidIsoDate } from "./dates";
 import { Money } from "./money";
 
 export type Frequency = "WEEKLY" | "BIWEEKLY" | "MONTHLY";
@@ -36,25 +37,6 @@ export class InvalidLoanTermsError extends Error {
     super(message);
     this.name = "InvalidLoanTermsError";
   }
-}
-
-function addDays(isoDate: string, days: number): string {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  const date = new Date(Date.UTC(year!, month! - 1, day! + days));
-  return date.toISOString().slice(0, 10);
-}
-
-function addMonths(isoDate: string, months: number): string {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  const lastDayOfTargetMonth = new Date(Date.UTC(year!, month! - 1 + months + 1, 0)).getUTCDate();
-  const date = new Date(
-    Date.UTC(year!, month! - 1 + months, Math.min(day!, lastDayOfTargetMonth)),
-  );
-  return date.toISOString().slice(0, 10);
-}
-
-function isValidIsoDate(isoDate: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(isoDate) && addDays(isoDate, 0) === isoDate;
 }
 
 function validateLoanTerms(terms: LoanTerms): void {
