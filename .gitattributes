@@ -1,0 +1,7 @@
+# Saltos de línea consistentes entre Windows y Linux/CI
+* text=auto eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary

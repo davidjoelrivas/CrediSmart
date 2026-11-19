@@ -1,0 +1,39 @@
+# Dependencias y builds
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# Secretos y configuración local (NUNCA versionar)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# Bases de datos y archivos locales
+*.sqlite
+*.db
+*.dump
+*.sql.gz
+mysql-data/
+uploads/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor / sistema operativo
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Herramientas locales de IA (preferencias personales)
+.claude/settings.local.json
