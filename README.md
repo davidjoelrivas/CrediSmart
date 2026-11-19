@@ -2,7 +2,7 @@
 
 Sistema de gestión de préstamos para prestamistas independientes. Acompaña el ciclo completo del crédito: desde que una persona pide un préstamo (pre-calificación) hasta que termina de pagarlo (contrato, plan de pagos, recibos, mora y control del capital).
 
-> **Estado del proyecto:** fase de definición y fundaciones. Todavía no hay código ejecutable; el repositorio crece paso a paso y cada sección de este README indica qué existe y qué está planificado.
+> **Estado del proyecto:** fase de fundaciones. Ya existe el primer paquete del motor financiero (dinero y plan de cuotas con interés fijo) con pruebas automáticas; el resto del sistema se construye paso a paso y cada sección de este README indica qué existe y qué está planificado.
 
 ## Verificación del proyecto
 
@@ -34,6 +34,23 @@ Credit Smart convierte ese proceso manual en un flujo de trabajo completo, y no 
 - **Funciona en la calle:** pensado para teléfonos modestos y conexión inestable (PWA con modo offline).
 - **Configurable, no cableado:** tasas, mora y topes legales son datos, no constantes.
 - **Explicable antes que "inteligente":** el sistema orienta; no aprueba ni rechaza personas por sí solo.
+
+## Qué existe hoy
+
+Paquete `packages/domain` (TypeScript puro, sin base de datos ni framework):
+
+- **`Money`:** dinero en centavos enteros, sin decimales de punto flotante. Suma, resta, aplica tasas en puntos base y por proporción con redondeo half-up, reparte montos sin perder centavos y los muestra con formato (`L 1,250.50`).
+- **`buildSchedule`:** plan de cuotas con interés fijo para pagos semanales, quincenales o mensuales. La última cuota absorbe la diferencia de redondeo y las fechas mensuales se ajustan al último día del mes.
+- **Pruebas:** 33 pruebas automáticas con Vitest, incluidas pruebas de propiedades con fast-check (el capital y el interés siempre cuadran y las fechas siempre avanzan).
+
+## Cómo correr las pruebas
+
+Requisitos: Node 24 y pnpm 12.
+
+```bash
+pnpm install
+pnpm test
+```
 
 ## Stack planificado
 
