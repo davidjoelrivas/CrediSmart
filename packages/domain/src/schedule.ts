@@ -21,6 +21,16 @@ export interface Installment {
   total: Money;
 }
 
+const BASIS_POINTS_PER_UNIT = 10_000;
+const DAYS_PER_WEEK = 7;
+
+/** Convención comercial: 1 mes = 4 semanas, 1 quincena = 2 semanas. */
+const WEEKS_PER_PERIOD: Record<Frequency, number> = {
+  WEEKLY: 1,
+  BIWEEKLY: 2,
+  MONTHLY: 4,
+};
+
 export class InvalidLoanTermsError extends Error {
   constructor(message: string) {
     super(message);
@@ -59,27 +69,12 @@ export function buildSchedule(terms: LoanTerms): Installment[] {
     throw new InvalidLoanTermsError("La fecha de inicio debe tener el formato AAAA-MM-DD");
   }
 
-  let weeksPerPayment: number;
-  if (terms.paymentFrequency === "WEEKLY") {
-    weeksPerPayment = 1;
-  } else if (terms.paymentFrequency === "BIWEEKLY") {
-    weeksPerPayment = 2;
-  } else {
-    weeksPerPayment = 4;
-  }
-
-  let weeksPerRatePeriod: number;
-  if (terms.ratePeriod === "WEEKLY") {
-    weeksPerRatePeriod = 1;
-  } else if (terms.ratePeriod === "BIWEEKLY") {
-    weeksPerRatePeriod = 2;
-  } else {
-    weeksPerRatePeriod = 4;
-  }
+  const weeksPerPayment = WEEKS_PER_PERIOD[terms.paymentFrequency];
+  const weeksPerRatePeriod = WEEKS_PER_PERIOD[terms.ratePeriod];
 
   const totalInterest = terms.principal.multiplyByRatio(
     terms.rateBp * terms.installments * weeksPerPayment,
-    10000 * weeksPerRatePeriod,
+    BASIS_POINTS_PER_UNIT * weeksPerRatePeriod,
   );
   const principalParts = terms.principal.splitEvenly(terms.installments);
   const interestParts = totalInterest.splitEvenly(terms.installments);
@@ -87,12 +82,10 @@ export function buildSchedule(terms: LoanTerms): Installment[] {
   const schedule: Installment[] = [];
   for (let number = 1; number <= terms.installments; number++) {
     let dueDate: string;
-    if (terms.paymentFrequency === "WEEKLY") {
-      dueDate = addDays(terms.startDate, 7 * number);
-    } else if (terms.paymentFrequency === "BIWEEKLY") {
-      dueDate = addDays(terms.startDate, 14 * number);
-    } else {
+    if (terms.paymentFrequency === "MONTHLY") {
       dueDate = addMonths(terms.startDate, number);
+    } else {
+      dueDate = addDays(terms.startDate, DAYS_PER_WEEK * weeksPerPayment * number);
     }
     const principal = principalParts[number - 1]!;
     const interest = interestParts[number - 1]!;
