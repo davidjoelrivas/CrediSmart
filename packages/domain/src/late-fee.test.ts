@@ -1,11 +1,20 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { calculateLateFee, InvalidLateFeeInputError, type LateFeeInput } from "./late-fee";
+import {
+  calculateLateFee,
+  FixedPerDayLateFee,
+  InvalidLateFeeInputError,
+  NoLateFee,
+  PercentOfOverdueLateFee,
+  PercentPerDayLateFee,
+  type LateFeeInput,
+  type LateFeePolicy,
+} from "./late-fee";
 import { Money } from "./money";
 
 function inputOf(overrides: Partial<LateFeeInput> = {}): LateFeeInput {
   return {
-    policy: { type: "PERCENT_OF_OVERDUE", rateBp: 500 },
+    policy: new PercentOfOverdueLateFee(500),
     dueDate: "2026-12-15",
     overdueAmount: Money.fromLempiras("2750"),
     asOf: "2026-12-25",
@@ -36,22 +45,22 @@ describe("calculateLateFee: cuándo hay mora", () => {
 });
 
 describe("calculateLateFee: políticas", () => {
-  it("NONE nunca cobra mora", () => {
-    expect(feeCents(inputOf({ policy: { type: "NONE" } }))).toBe(0);
+  it("NoLateFee nunca cobra mora", () => {
+    expect(feeCents(inputOf({ policy: new NoLateFee() }))).toBe(0);
   });
 
-  it("PERCENT_OF_OVERDUE cobra 5 % de L 2,750 una sola vez, sin importar los días", () => {
+  it("PercentOfOverdueLateFee cobra 5 % de L 2,750 una sola vez, sin importar los días", () => {
     expect(feeCents(inputOf({ asOf: "2026-12-16" }))).toBe(13750);
     expect(feeCents(inputOf({ asOf: "2027-03-15" }))).toBe(13750);
   });
 
-  it("FIXED_PER_DAY cobra L 25 por cada día de atraso", () => {
-    const policy = { type: "FIXED_PER_DAY", amountPerDay: Money.fromLempiras("25") } as const;
+  it("FixedPerDayLateFee cobra L 25 por cada día de atraso", () => {
+    const policy = new FixedPerDayLateFee(Money.fromLempiras("25"));
     expect(feeCents(inputOf({ policy, asOf: "2026-12-25" }))).toBe(25000);
   });
 
-  it("PERCENT_PER_DAY cobra 1 % diario: 5 días sobre L 1,000 son L 50", () => {
-    const policy = { type: "PERCENT_PER_DAY", rateBp: 100 } as const;
+  it("PercentPerDayLateFee cobra 1 % diario: 5 días sobre L 1,000 son L 50", () => {
+    const policy = new PercentPerDayLateFee(100);
     expect(
       feeCents(
         inputOf({
@@ -76,20 +85,73 @@ describe("calculateLateFee: políticas", () => {
         fc.integer({ min: 0, max: 365 }),
         fc.integer({ min: 0, max: 30 }),
         (overdueCents, rateBp, daysLate, graceDays) => {
-          const policy = { type: "PERCENT_PER_DAY", rateBp } as const;
           const base = inputOf({
-            policy,
+            policy: new PercentPerDayLateFee(rateBp),
             overdueAmount: Money.fromCents(overdueCents),
             graceDays,
             asOf: new Date(Date.UTC(2026, 11, 15 + daysLate)).toISOString().slice(0, 10),
           });
-          const later = { ...base, asOf: new Date(Date.UTC(2026, 11, 16 + daysLate)).toISOString().slice(0, 10) };
+          const later = {
+            ...base,
+            asOf: new Date(Date.UTC(2026, 11, 16 + daysLate)).toISOString().slice(0, 10),
+          };
 
           expect(feeCents(base)).toBeGreaterThanOrEqual(0);
           expect(feeCents(later)).toBeGreaterThanOrEqual(feeCents(base));
         },
       ),
     );
+  });
+});
+
+describe("LateFeePolicy: contrato común (sustitución de Liskov)", () => {
+  const policies: [string, LateFeePolicy][] = [
+    ["NoLateFee", new NoLateFee()],
+    ["PercentOfOverdueLateFee", new PercentOfOverdueLateFee(500)],
+    ["FixedPerDayLateFee", new FixedPerDayLateFee(Money.fromLempiras("25"))],
+    ["PercentPerDayLateFee", new PercentPerDayLateFee(100)],
+  ];
+
+  it.each(policies)("%s devuelve una mora que nunca es negativa", (_name, policy) => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 100_000_000 }),
+        fc.integer({ min: 1, max: 365 }),
+        (overdueCents, daysLate) => {
+          const fee = policy.calculate(Money.fromCents(overdueCents), daysLate);
+          expect(fee.isNegative()).toBe(false);
+        },
+      ),
+    );
+  });
+});
+
+describe("calculateLateFee: extensión sin modificar el cálculo", () => {
+  it("acepta una política nueva definida fuera del módulo", () => {
+    class CappedLateFee implements LateFeePolicy {
+      constructor(
+        private readonly inner: LateFeePolicy,
+        private readonly cap: Money,
+      ) {}
+
+      calculate(overdueAmount: Money, daysLate: number): Money {
+        const fee = this.inner.calculate(overdueAmount, daysLate);
+        return fee.compareTo(this.cap) === 1 ? this.cap : fee;
+      }
+    }
+
+    const policy = new CappedLateFee(
+      new PercentPerDayLateFee(100),
+      Money.fromLempiras("30"),
+    );
+    const input = inputOf({
+      policy,
+      overdueAmount: Money.fromLempiras("1000"),
+      asOf: "2026-12-25",
+    });
+
+    // Sin tope serían L 100 (1 % diario durante 10 días); con tope, L 30.
+    expect(feeCents(input)).toBe(3000);
   });
 });
 
@@ -114,17 +176,9 @@ describe("calculateLateFee: validaciones", () => {
     );
   });
 
-  it("rechaza tasas y montos de política inválidos", () => {
-    expect(() =>
-      calculateLateFee(inputOf({ policy: { type: "PERCENT_OF_OVERDUE", rateBp: -5 } })),
-    ).toThrow(InvalidLateFeeInputError);
-    expect(() =>
-      calculateLateFee(inputOf({ policy: { type: "PERCENT_PER_DAY", rateBp: 1.5 } })),
-    ).toThrow(InvalidLateFeeInputError);
-    expect(() =>
-      calculateLateFee(
-        inputOf({ policy: { type: "FIXED_PER_DAY", amountPerDay: Money.fromCents(-100) } }),
-      ),
-    ).toThrow(InvalidLateFeeInputError);
+  it("rechaza políticas con tasas o montos inválidos al crearlas", () => {
+    expect(() => new PercentOfOverdueLateFee(-5)).toThrow(InvalidLateFeeInputError);
+    expect(() => new PercentPerDayLateFee(1.5)).toThrow(InvalidLateFeeInputError);
+    expect(() => new FixedPerDayLateFee(Money.fromCents(-100))).toThrow(InvalidLateFeeInputError);
   });
 });
