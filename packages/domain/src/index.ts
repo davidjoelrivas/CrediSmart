@@ -1,6 +1,6 @@
 export { InvalidMoneyError, Money } from "./money";
 export { buildSchedule, InvalidLoanTermsError } from "./schedule";
-export type { Frequency, Installment, LoanTerms } from "./schedule";
+export type { Frequency, InterestMethod, Installment, LoanTerms } from "./schedule";
 export {
   calculateLateFee,
   FixedPerDayLateFee,
