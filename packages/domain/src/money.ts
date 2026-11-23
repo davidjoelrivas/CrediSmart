@@ -100,14 +100,15 @@ export class Money {
   }
 
   /**
-   * Reparte el monto en partes casi iguales sin perder centavos:
-   * las primeras n-1 se redondean y la última absorbe la diferencia.
+   * Reparte el monto en partes casi iguales sin perder centavos: las primeras
+   * n-1 partes son iguales (truncadas hacia cero) y la última absorbe el resto.
+   * Así ninguna parte puede quedar con signo contrario al del monto total.
    */
   splitEvenly(parts: number): Money[] {
     if (!Number.isSafeInteger(parts) || parts < 1) {
       throw new InvalidMoneyError("Las partes deben ser un entero mayor o igual a 1");
     }
-    const share = toSafeCents(divideRoundingHalfUp(BigInt(this.cents), BigInt(parts)));
+    const share = toSafeCents(BigInt(this.cents) / BigInt(parts));
     const result = Array.from({ length: parts - 1 }, () => new Money(share));
     result.push(new Money(this.cents - share * (parts - 1)));
     return result;
