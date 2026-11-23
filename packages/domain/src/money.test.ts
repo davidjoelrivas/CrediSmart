@@ -116,6 +116,34 @@ describe("Money: reparto en partes", () => {
     expect(() => Money.fromCents(100).splitEvenly(2.5)).toThrow(InvalidMoneyError);
   });
 
+  it("con montos pequeños y muchas partes, ninguna parte queda negativa", () => {
+    // Antes se redondeaba cada parte: 13 centavos en 24 partes daban 1 × 23 y -10 al final.
+    const parts = Money.fromCents(13).splitEvenly(24).map((part) => part.toCents());
+    expect(parts.every((part) => part >= 0)).toBe(true);
+    expect(parts.reduce((sum, part) => sum + part, 0)).toBe(13);
+    expect(parts.slice(0, 23).every((part) => part === 0)).toBe(true);
+    expect(parts[23]).toBe(13);
+  });
+
+  it("reparte montos negativos manteniendo el signo en todas las partes", () => {
+    const parts = Money.fromCents(-13).splitEvenly(24).map((part) => part.toCents());
+    expect(parts.every((part) => part <= 0)).toBe(true);
+    expect(parts.reduce((sum, part) => sum + part, 0)).toBe(-13);
+  });
+
+  it("propiedad: ninguna parte es negativa si el monto no lo es", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 1_000_000_000 }),
+        fc.integer({ min: 1, max: 120 }),
+        (cents, parts) => {
+          const split = Money.fromCents(cents).splitEvenly(parts);
+          expect(split.every((part) => !part.isNegative())).toBe(true);
+        },
+      ),
+    );
+  });
+
   it("propiedad: las partes siempre suman el total exacto", () => {
     fc.assert(
       fc.property(
