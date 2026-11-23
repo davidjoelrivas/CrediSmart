@@ -69,3 +69,18 @@ export {
 export type { JournalEntry, JournalLine, PaymentMethod } from "./journal-entry";
 export { balanceOf, isBalanced, loanPrincipalBalance, summarize, trialBalance } from "./ledger";
 export type { LedgerSummary, TrialBalanceRow } from "./ledger";
+export {
+  AprCapExceededError,
+  calculateApr,
+  calculateScheduleApr,
+  checkAprCap,
+  InvalidAprInputError,
+  requireAprCapCompliance,
+} from "./apr";
+export type {
+  AprCapCheck,
+  AprCapDecision,
+  AprCapOverride,
+  AprInput,
+  AprPayment,
+} from "./apr";
