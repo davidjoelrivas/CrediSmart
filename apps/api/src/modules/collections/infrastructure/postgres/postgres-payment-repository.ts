@@ -91,6 +91,26 @@ export class PostgresPaymentRepository implements PaymentRepository {
     return Promise.all(rows.map(async (row) => paymentOf(row, await this.allocationsOf(asString(row.id)))));
   }
 
+  async listRecent(organizationId: string, limit: number): Promise<Payment[]> {
+    const rows = await selectRows(
+      this.db,
+      `SELECT ${PAYMENT_COLUMNS} FROM payments WHERE organization_id = $1
+       ORDER BY created_at DESC, id DESC LIMIT $2`,
+      [organizationId, limit],
+    );
+    return Promise.all(rows.map(async (row) => paymentOf(row, await this.allocationsOf(asString(row.id)))));
+  }
+
+  async netReceivedBetween(organizationId: string, from: string, to: string): Promise<Money> {
+    const [row] = await selectRows(
+      this.db,
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
+       WHERE organization_id = $1 AND received_on BETWEEN $2 AND $3`,
+      [organizationId, from, to],
+    );
+    return Money.fromCents(asNumber(row!.total));
+  }
+
   private async findOne(condition: string, params: unknown[]): Promise<Payment | null> {
     const [row] = await selectRows(this.db, `SELECT ${PAYMENT_COLUMNS} FROM payments WHERE ${condition}`, params);
     return row ? paymentOf(row, await this.allocationsOf(asString(row.id))) : null;

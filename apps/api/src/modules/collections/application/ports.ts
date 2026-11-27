@@ -1,3 +1,4 @@
+import type { Money } from "@app/domain";
 import type { Payment } from "../domain/payment";
 import type { Receipt } from "../domain/receipt";
 
@@ -8,6 +9,10 @@ export interface PaymentRepository {
   /** El reverso de un pago, si ya fue revertido. */
   findReversalOf(organizationId: string, paymentId: string): Promise<Payment | null>;
   listByLoan(organizationId: string, loanId: string): Promise<Payment[]>;
+  /** Los pagos más recientes de la organización (incluye reversos), del más nuevo al más viejo. */
+  listRecent(organizationId: string, limit: number): Promise<Payment[]>;
+  /** Neto recibido (pagos menos reversos) con fecha de cobro entre `from` y `to`, ambas inclusive. */
+  netReceivedBetween(organizationId: string, from: string, to: string): Promise<Money>;
 }
 
 export interface ReceiptRepository {
