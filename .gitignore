@@ -23,6 +23,10 @@ secrets/
 mysql-data/
 uploads/
 
+# Respaldos de la base de datos (contienen datos de clientes)
+backups/
+*.dump
+
 # Logs
 *.log
 npm-debug.log*

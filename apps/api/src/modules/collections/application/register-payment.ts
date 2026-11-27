@@ -64,15 +64,18 @@ export class RegisterPayment {
     }
 
     return this.deps.unitOfWork.run(async (repositories) => {
+      // Primero se lee (y se bloquea) el préstamo y recién después se revisa la idempotencia:
+      // así, dos solicitudes iguales y simultáneas se atienden una tras otra y no duplican el pago.
+      const loan = await repositories.loans.findById(context.organizationId, input.loanId);
+      if (!loan) {
+        throw new NotFoundError("Préstamo", input.loanId);
+      }
+
       const replay = await this.findReplay(repositories, context, input);
       if (replay) {
         return replay;
       }
 
-      const loan = await repositories.loans.findById(context.organizationId, input.loanId);
-      if (!loan) {
-        throw new NotFoundError("Préstamo", input.loanId);
-      }
       if (loan.status !== "ACTIVE") {
         throw new ConflictError(`El préstamo ${loan.code} no admite pagos porque está ${loan.status}`);
       }
