@@ -1,0 +1,20 @@
+{
+  "name": "@app/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "API del sistema: casos de uso, puertos y adaptadores",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1",
+    "fast-check": "^4.10.3"
+  }
+}

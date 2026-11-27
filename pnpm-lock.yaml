@@ -175,6 +175,22 @@ importers:
 
   .: {}
 
+  apps/api:
+    dependencies:
+      '@app/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+    devDependencies:
+      fast-check:
+        specifier: ^4.10.3
+        version: 4.10.3
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.1.1
+        version: 5.1.1(vite@8.3.8)
+
   packages/domain:
     devDependencies:
       fast-check:
