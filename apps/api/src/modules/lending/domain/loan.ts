@@ -1,5 +1,7 @@
 import {
   createBalance,
+  NO_LATE_FEE,
+  type LateFeeConfig,
   statusOf,
   type InstallmentBalance,
   type LoanTerms,
@@ -27,6 +29,10 @@ export interface Loan {
   aprBp: number;
   /** Motivo con el que se aprobó a pesar de superar el tope legal configurado; null si no hizo falta. */
   aprCapOverrideReason: string | null;
+  /** Cómo se cobra la mora; se pacta al aprobar y no cambia. */
+  lateFee: LateFeeConfig;
+  /** Días después del vencimiento en los que todavía no se cobra mora. */
+  graceDays: number;
   status: LoanStatus;
   balances: readonly InstallmentBalance[];
   approvedOn: string;
@@ -43,6 +49,8 @@ export interface NewLoan {
   terms: LoanTerms;
   aprBp: number;
   aprCapOverrideReason: string | null;
+  lateFee?: LateFeeConfig;
+  graceDays?: number;
   approvedOn: string;
 }
 
@@ -50,11 +58,21 @@ export interface NewLoan {
 export function approveLoan(input: NewLoan): Loan {
   return {
     ...input,
+    lateFee: input.lateFee ?? NO_LATE_FEE,
+    graceDays: input.graceDays ?? 0,
     status: "PENDING_SIGNATURE",
     balances: buildSchedule(input.terms).map(createBalance),
     disbursedOn: null,
     closedOn: null,
   };
+}
+
+/** Guarda la mora recalculada de las cuotas; solo tiene sentido en un préstamo activo. */
+export function applyLateFees(loan: Loan, balances: readonly InstallmentBalance[]): Loan {
+  if (loan.status !== "ACTIVE") {
+    throw new InvalidLoanTransitionError(loan.status, "calcular mora de");
+  }
+  return { ...loan, balances };
 }
 
 /** Marca el préstamo como desembolsado: solo es posible desde "pendiente de firma". */
