@@ -1,4 +1,7 @@
 import type { Pool } from "pg";
+import { PostgresBorrowerRepository } from "../../../modules/borrowers/infrastructure/postgres/postgres-borrower-repository";
+import { PostgresPrescreeningRepository } from "../../../modules/prescreening/infrastructure/postgres/postgres-prescreening-repository";
+import { PostgresOrganizationRepository } from "../../../modules/organizations/infrastructure/postgres/postgres-organization-repository";
 import { PostgresLedgerRepository } from "../../../modules/accounting/infrastructure/postgres/postgres-ledger-repository";
 import { PostgresAuditLog } from "../../../modules/audit/infrastructure/postgres/postgres-audit-log";
 import { PostgresPaymentRepository } from "../../../modules/collections/infrastructure/postgres/postgres-payment-repository";
@@ -10,6 +13,7 @@ import { PostgresLoanRepository } from "../../../modules/lending/infrastructure/
 import { PostgresLoanCodeSequence } from "../../../modules/lending/infrastructure/postgres/postgres-loan-support";
 import type { UnitOfWork } from "../../application/ports";
 import type { Repositories } from "../../application/repositories";
+import type { FieldCipher } from "../crypto/field-cipher";
 import type { Executor } from "./sql";
 
 /** Códigos de error de Postgres que se resuelven reintentando la transacción completa. */
@@ -24,7 +28,10 @@ function isRetryable(error: unknown): boolean {
 
 /** Conecta los puertos de la aplicación con PostgreSQL. */
 export class PostgresDatabase {
-  constructor(readonly pool: Pool) {}
+  constructor(
+    readonly pool: Pool,
+    private readonly cipher: FieldCipher,
+  ) {}
 
   /** Repositorios para leer fuera de una transacción. */
   repositories(): Repositories {
@@ -37,6 +44,9 @@ export class PostgresDatabase {
 
   repositoriesFor(executor: Executor, lockRows: boolean): Repositories {
     return {
+      organizations: new PostgresOrganizationRepository(executor),
+      prescreening: new PostgresPrescreeningRepository(executor),
+      borrowers: new PostgresBorrowerRepository(executor, this.cipher),
       loans: new PostgresLoanRepository(executor, lockRows),
       loanCodes: new PostgresLoanCodeSequence(executor),
       payments: new PostgresPaymentRepository(executor),
