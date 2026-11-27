@@ -1,5 +1,6 @@
 import {
   Money,
+  parseLateFeeConfig,
   type Frequency,
   type InstallmentBalance,
   type InterestMethod,
@@ -18,7 +19,7 @@ import {
 
 const LOAN_COLUMNS = `id, organization_id, borrower_id, code, principal, rate_bp, rate_period, payment_frequency,
   installments_count, interest_method, start_date, apr_bp, apr_cap_override_reason, status,
-  approved_on, disbursed_on, closed_on`;
+  approved_on, disbursed_on, closed_on, late_fee_policy, grace_days`;
 
 function balanceOf(row: Row): InstallmentBalance {
   return {
@@ -50,6 +51,8 @@ function loanOf(row: Row, balances: InstallmentBalance[]): Loan {
     },
     aprBp: asNumber(row.apr_bp),
     aprCapOverrideReason: asNullableString(row.apr_cap_override_reason),
+    lateFee: parseLateFeeConfig(row.late_fee_policy),
+    graceDays: asNumber(row.grace_days),
     status: asString(row.status) as LoanStatus,
     balances,
     approvedOn: asString(row.approved_on),
@@ -74,7 +77,7 @@ export class PostgresLoanRepository implements LoanRepository {
     await runStatement(
       this.db,
       `INSERT INTO loans (${LOAN_COLUMNS})
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, disbursed_on = EXCLUDED.disbursed_on,
          closed_on = EXCLUDED.closed_on`,
       [
@@ -95,6 +98,8 @@ export class PostgresLoanRepository implements LoanRepository {
         loan.approvedOn,
         loan.disbursedOn,
         loan.closedOn,
+        JSON.stringify(loan.lateFee),
+        loan.graceDays,
       ],
     );
 

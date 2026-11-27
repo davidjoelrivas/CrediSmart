@@ -20,3 +20,8 @@ export interface IdGenerator {
 export interface UnitOfWork<R> {
   run<T>(work: (repositories: R) => Promise<T>): Promise<T>;
 }
+
+/** Instante exacto (fecha y hora). Se usa para vencimientos de sesión y bloqueos, que dependen de la hora. */
+export interface InstantClock {
+  now(): Date;
+}

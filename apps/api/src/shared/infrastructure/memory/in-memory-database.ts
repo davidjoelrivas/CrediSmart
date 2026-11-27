@@ -1,4 +1,9 @@
-import type { JournalEntry } from "@app/domain";
+import { Money, type JournalEntry } from "@app/domain";
+import type { BorrowerRepository, BorrowerSearch } from "../../../modules/borrowers/application/ports";
+import type { Borrower } from "../../../modules/borrowers/domain/borrower";
+import type { OrganizationRepository, OrganizationSummary } from "../../../modules/organizations/application/ports";
+import type { PrescreeningRepository, PublicOrganization, Submission } from "../../../modules/prescreening/application/ports";
+import type { PrescreeningForm } from "@app/domain";
 import type { LedgerRepository } from "../../../modules/accounting/application/ports";
 import type { AuditLog, AuditRecord } from "../../../modules/audit/application/ports";
 import type {
@@ -19,6 +24,9 @@ import type { Clock, IdGenerator, UnitOfWork } from "../../application/ports";
 import type { Repositories } from "../../application/repositories";
 
 interface State {
+  prescreeningForms: Map<string, PrescreeningForm>;
+  submissions: Submission[];
+  borrowers: Map<string, Borrower>;
   loans: Map<string, Loan>;
   ledger: { organizationId: string; entry: JournalEntry }[];
   audit: AuditRecord[];
@@ -30,6 +38,9 @@ interface State {
 
 function emptyState(): State {
   return {
+    prescreeningForms: new Map(),
+    submissions: [],
+    borrowers: new Map(),
     loans: new Map(),
     ledger: [],
     audit: [],
@@ -42,6 +53,9 @@ function emptyState(): State {
 
 function copyOf(state: State): State {
   return {
+    prescreeningForms: new Map(state.prescreeningForms),
+    submissions: [...state.submissions],
+    borrowers: new Map(state.borrowers),
     loans: new Map(state.loans),
     ledger: [...state.ledger],
     audit: [...state.audit],
@@ -58,9 +72,14 @@ function copyOf(state: State): State {
  */
 export class InMemoryDatabase {
   state: State = emptyState();
+  /** Enlaces públicos de las organizaciones (texto a id); no forman parte de las transacciones. */
+  readonly slugs = new Map<string, string>();
 
   repositories(): Repositories {
     return {
+      organizations: new InMemoryOrganizationRepository(),
+      prescreening: new InMemoryPrescreeningRepository(this),
+      borrowers: new InMemoryBorrowerRepository(this),
       loans: new InMemoryLoanRepository(this),
       loanCodes: new InMemoryLoanCodeSequence(this),
       payments: new InMemoryPaymentRepository(this),
@@ -83,6 +102,116 @@ export class InMemoryUnitOfWork implements UnitOfWork<Repositories> {
       this.database.state = snapshot;
       throw error;
     }
+  }
+}
+
+class InMemoryOrganizationRepository implements OrganizationRepository {
+  async findById(id: string): Promise<OrganizationSummary | null> {
+    return { id, name: "Crédito de prueba" };
+  }
+
+  async listIds(): Promise<string[]> {
+    return [];
+  }
+}
+
+class InMemoryPrescreeningRepository implements PrescreeningRepository {
+  constructor(private readonly database: InMemoryDatabase) {}
+
+  async findOrganizationBySlug(slug: string): Promise<PublicOrganization | null> {
+    const id = this.database.slugs.get(slug);
+    return id ? { id, name: "Crédito de prueba" } : null;
+  }
+
+  async slugOf(organizationId: string): Promise<string | null> {
+    for (const [slug, id] of this.database.slugs) {
+      if (id === organizationId) return slug;
+    }
+    return null;
+  }
+
+  async getForm(organizationId: string): Promise<PrescreeningForm | null> {
+    return this.database.state.prescreeningForms.get(organizationId) ?? null;
+  }
+
+  async saveForm(organizationId: string, form: PrescreeningForm): Promise<void> {
+    this.database.state.prescreeningForms.set(organizationId, form);
+  }
+
+  async saveSubmission(submission: Submission): Promise<void> {
+    this.database.state.submissions.push(submission);
+  }
+
+  async findSubmission(organizationId: string, id: string): Promise<Submission | null> {
+    return this.database.state.submissions.find((item) => item.organizationId === organizationId && item.id === id) ?? null;
+  }
+
+  async listSubmissions(organizationId: string, filter: { status?: "NEW" | "DECIDED" }): Promise<Submission[]> {
+    return this.database.state.submissions
+      .filter((item) => item.organizationId === organizationId && (!filter.status || item.status === filter.status))
+      .slice()
+      .reverse();
+  }
+
+  async recordDecision(
+    organizationId: string,
+    id: string,
+    decision: { decision: "CONTINUE" | "DISCARD"; note: string | null; decidedBy: string; decidedOn: string; contradictsOutcome: boolean },
+  ): Promise<void> {
+    this.database.state.submissions = this.database.state.submissions.map((item) =>
+      item.organizationId === organizationId && item.id === id
+        ? {
+            ...item,
+            status: "DECIDED",
+            decision: decision.decision,
+            decisionNote: decision.note,
+            decidedBy: decision.decidedBy,
+            decidedOn: decision.decidedOn,
+            contradictsOutcome: decision.contradictsOutcome,
+          }
+        : item,
+    );
+  }
+}
+
+class InMemoryBorrowerRepository implements BorrowerRepository {
+  constructor(private readonly database: InMemoryDatabase) {}
+
+  async save(borrower: Borrower): Promise<void> {
+    this.database.state.borrowers.set(`${borrower.organizationId}:${borrower.id}`, borrower);
+  }
+
+  private ofOrganization(organizationId: string): Borrower[] {
+    return [...this.database.state.borrowers.values()].filter(
+      (borrower) => borrower.organizationId === organizationId,
+    );
+  }
+
+  async findById(organizationId: string, id: string): Promise<Borrower | null> {
+    return this.database.state.borrowers.get(`${organizationId}:${id}`) ?? null;
+  }
+
+  async findByNationalId(organizationId: string, nationalId: string): Promise<Borrower | null> {
+    return this.ofOrganization(organizationId).find((borrower) => borrower.nationalId === nationalId) ?? null;
+  }
+
+  async namesByIds(organizationId: string, ids: readonly string[]): Promise<Map<string, string>> {
+    return new Map(
+      this.ofOrganization(organizationId)
+        .filter((borrower) => ids.includes(borrower.id))
+        .map((borrower) => [borrower.id, borrower.fullName]),
+    );
+  }
+
+  async search(organizationId: string, search: BorrowerSearch): Promise<Borrower[]> {
+    const text = search.text?.toLowerCase();
+    return this.ofOrganization(organizationId)
+      .filter(
+        (borrower) =>
+          !text || borrower.fullName.toLowerCase().includes(text) || (borrower.phone ?? "").includes(text),
+      )
+      .sort((a, b) => a.fullName.localeCompare(b.fullName))
+      .slice(search.offset, search.offset + search.limit);
   }
 }
 
@@ -146,6 +275,23 @@ class InMemoryPaymentRepository implements PaymentRepository {
           payment.organizationId === organizationId && payment.reversesPaymentId === paymentId,
       ) ?? null
     );
+  }
+
+  async listRecent(organizationId: string, limit: number): Promise<Payment[]> {
+    return this.database.state.payments
+      .filter((payment) => payment.organizationId === organizationId)
+      .slice()
+      .reverse()
+      .slice(0, limit);
+  }
+
+  async netReceivedBetween(organizationId: string, from: string, to: string): Promise<Money> {
+    return this.database.state.payments
+      .filter(
+        (payment) =>
+          payment.organizationId === organizationId && payment.receivedOn >= from && payment.receivedOn <= to,
+      )
+      .reduce((sum, payment) => sum.add(payment.amount), Money.zero());
   }
 
   async listByLoan(organizationId: string, loanId: string): Promise<Payment[]> {

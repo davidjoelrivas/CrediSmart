@@ -1,5 +1,8 @@
 import {
   buildSchedule,
+  InvalidLateFeeInputError,
+  NO_LATE_FEE,
+  type LateFeeConfig,
   calculateScheduleApr,
   checkAprCap,
   requireAprCapCompliance,
@@ -16,6 +19,10 @@ export interface ApproveLoanInput {
   terms: LoanTerms;
   /** Obligatorio, con motivo, solo si la tasa efectiva anual supera el tope legal configurado. */
   aprCapOverride?: AprCapOverride;
+  /** Política de mora pactada; por defecto no se cobra mora. */
+  lateFee?: LateFeeConfig;
+  /** Días de gracia antes de empezar a cobrar mora. */
+  graceDays?: number;
 }
 
 /**
@@ -33,6 +40,10 @@ export class ApproveLoan {
   ) {}
 
   async execute(context: RequestContext, input: ApproveLoanInput): Promise<Loan> {
+    const graceDays = input.graceDays ?? 0;
+    if (!Number.isInteger(graceDays) || graceDays < 0 || graceDays > 60) {
+      throw new InvalidLateFeeInputError("Los días de gracia deben ser un entero entre 0 y 60");
+    }
     const schedule = buildSchedule(input.terms);
     const aprBp = calculateScheduleApr(input.terms.principal, input.terms.startDate, schedule);
     const aprCapBp = await this.deps.legalCap.aprCapBp(context.organizationId);
@@ -49,6 +60,8 @@ export class ApproveLoan {
         terms: input.terms,
         aprBp,
         aprCapOverrideReason: decision.reason,
+        lateFee: input.lateFee ?? NO_LATE_FEE,
+        graceDays,
         approvedOn,
       });
 
@@ -65,6 +78,8 @@ export class ApproveLoan {
           principalCents: input.terms.principal.toCents(),
           aprBp,
           aprCapOverrideReason: decision.reason,
+          lateFeeType: (input.lateFee ?? NO_LATE_FEE).type,
+          graceDays,
         },
       });
       return loan;

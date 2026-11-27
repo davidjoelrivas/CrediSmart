@@ -1,9 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
+import { FieldCipher } from "../../shared/infrastructure/crypto/field-cipher";
 import { parseDatabaseUrl, type DatabaseConfig } from "../../shared/infrastructure/postgres/connection";
 import { runStatement } from "../../shared/infrastructure/postgres/sql";
 import { newUuidV7 } from "../../shared/infrastructure/postgres/uuid";
+
+/** Llaves de cifrado aleatorias solo para pruebas: se generan una vez por proceso. */
+export const testCipher = new FieldCipher(randomBytes(32), randomBytes(32));
 
 export const TEST_DATABASE_NAME = "credit_smart_test";
 

@@ -11,6 +11,15 @@ export {
 } from "./late-fee";
 export type { LateFeeInput, LateFeePolicy } from "./late-fee";
 export {
+  describeLateFee,
+  lateFeePolicyFromConfig,
+  NO_LATE_FEE,
+  parseLateFeeConfig,
+} from "./late-fee-config";
+export type { LateFeeConfig } from "./late-fee-config";
+export { accrueLateFees, daysOverdue } from "./late-fee-accrual";
+export type { LateFeeAccrual } from "./late-fee-accrual";
+export {
   createBalance,
   InvalidBalanceError,
   outstandingOf,
@@ -85,3 +94,5 @@ export type {
   AprPayment,
 } from "./apr";
 export { addDays, addMonths, daysBetween, isValidIsoDate } from "./dates";
+
+export { integerInSpanish, lempirasInWords } from "./money-words";

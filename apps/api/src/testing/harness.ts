@@ -2,10 +2,18 @@ import { Money, type LoanTerms } from "@app/domain";
 import type { VerificationCodeGenerator } from "../modules/collections/application/ports";
 import { RegisterPayment } from "../modules/collections/application/register-payment";
 import { ReversePayment } from "../modules/collections/application/reverse-payment";
+import {
+  BorrowerQueries,
+  CreateBorrower,
+  UpdateBorrower,
+} from "../modules/borrowers/application/borrower-use-cases";
+import { GetDashboard } from "../modules/reporting/application/get-dashboard";
+import { LoanQueries } from "../modules/lending/application/loan-queries";
+import { AccrueLateFees } from "../modules/lending/application/accrue-late-fees";
 import { ApproveLoan } from "../modules/lending/application/approve-loan";
 import { DisburseLoan } from "../modules/lending/application/disburse-loan";
 import { SimulateLoan } from "../modules/lending/application/simulate-loan";
-import type { RequestContext } from "../shared/application/ports";
+import type { IdGenerator, RequestContext } from "../shared/application/ports";
 import {
   FixedClock,
   InMemoryDatabase,
@@ -21,22 +29,30 @@ export function createHarness(
     aprCapBp?: number | null;
     today?: string;
     verificationCodes?: VerificationCodeGenerator;
+    ids?: IdGenerator;
   } = {},
 ) {
   const database = new InMemoryDatabase();
   const clock = new FixedClock(options.today ?? "2026-12-01");
   const unitOfWork = new InMemoryUnitOfWork(database);
-  const ids = new SequentialIds("loan");
+  const ids = options.ids ?? new SequentialIds("loan");
   const legalCap = new StaticLegalCap(options.aprCapBp ?? null);
   const verificationCodes = options.verificationCodes ?? new SequentialVerificationCodes();
 
   return {
     database,
     clock,
+    unitOfWork,
     repositories: database.repositories(),
     simulateLoan: new SimulateLoan({ legalCap }),
     approveLoan: new ApproveLoan({ unitOfWork, clock, ids, legalCap }),
     disburseLoan: new DisburseLoan({ unitOfWork, clock }),
+    createBorrower: new CreateBorrower({ unitOfWork, clock, ids }),
+    updateBorrower: new UpdateBorrower({ unitOfWork, clock }),
+    borrowerQueries: new BorrowerQueries({ repositories: database.repositories() }),
+    getDashboard: new GetDashboard({ repositories: database.repositories(), clock }),
+    loanQueries: new LoanQueries({ repositories: database.repositories(), clock }),
+    accrueLateFees: new AccrueLateFees({ unitOfWork, clock }),
     registerPayment: new RegisterPayment({ unitOfWork, clock, ids, verificationCodes }),
     reversePayment: new ReversePayment({ unitOfWork, clock, ids }),
   };

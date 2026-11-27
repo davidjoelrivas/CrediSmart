@@ -13,15 +13,30 @@
     "db:check": "tsx --env-file-if-exists=../../.env src/cli/db-check.ts",
     "db:backup": "tsx --env-file-if-exists=../../.env src/cli/backup.ts",
     "db:seed:demo": "tsx --env-file-if-exists=../../.env src/cli/seed-demo.ts",
+    "users:create": "tsx --env-file-if-exists=../../.env src/cli/create-owner.ts",
+    "users:reset-password": "tsx --env-file-if-exists=../../.env src/cli/reset-password.ts",
+    "dev": "tsx watch --env-file-if-exists=../../.env src/server.ts",
+    "start": "tsx --env-file-if-exists=../../.env src/server.ts",
     "keys:generate": "tsx src/cli/generate-keys.ts"
   },
   "dependencies": {
+    "@app/contracts": "workspace:*",
     "@app/domain": "workspace:*",
-    "pg": "^8.23.1"
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.3.0",
+    "@fastify/static": "^11.0.0",
+    "fastify": "^5.12.8",
+    "pdfkit": "^0.21.0",
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.11",
+    "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "fast-check": "^4.10.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
