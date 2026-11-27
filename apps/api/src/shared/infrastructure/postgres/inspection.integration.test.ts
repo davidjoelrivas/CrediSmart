@@ -17,18 +17,18 @@ afterAll(async () => {
 
 describe("inspectDatabase", () => {
   it("reporta una base sana: migraciones aplicadas y todas las tablas protegidas", async () => {
-    const inspection = await inspectDatabase(client, 5);
+    const inspection = await inspectDatabase(client, 8);
 
     expect(inspection.healthy).toBe(true);
     expect(inspection.problems).toEqual([]);
     expect(inspection.version).toMatch(/PostgreSQL/);
-    expect(inspection.appliedMigrations).toHaveLength(5);
+    expect(inspection.appliedMigrations).toHaveLength(8);
     expect(inspection.tables).toContain("loans");
     expect(inspection.tablesWithoutRowSecurity).toEqual([]);
   });
 
   it("confirma que los roles públicos no tienen acceso a ninguna tabla", async () => {
-    const inspection = await inspectDatabase(client, 5);
+    const inspection = await inspectDatabase(client, 8);
 
     expect(inspection.exposedRoleAccess).toEqual([]);
   });
@@ -37,7 +37,7 @@ describe("inspectDatabase", () => {
     await client.query("BEGIN");
     try {
       await client.query("GRANT SELECT ON loans TO anon");
-      const inspection = await inspectDatabase(client, 5);
+      const inspection = await inspectDatabase(client, 8);
 
       expect(inspection.healthy).toBe(false);
       expect(inspection.exposedRoleAccess).toEqual(["anon puede SELECT en loans"]);
@@ -47,7 +47,7 @@ describe("inspectDatabase", () => {
   });
 
   it("avisa cuando faltan migraciones", async () => {
-    const inspection = await inspectDatabase(client, 9);
+    const inspection = await inspectDatabase(client, 12);
 
     expect(inspection.healthy).toBe(false);
     expect(inspection.problems[0]).toMatch(/Faltan migraciones/);
@@ -57,7 +57,7 @@ describe("inspectDatabase", () => {
     await client.query("BEGIN");
     try {
       await client.query("CREATE TABLE tabla_olvidada (id int)");
-      const inspection = await inspectDatabase(client, 5);
+      const inspection = await inspectDatabase(client, 8);
 
       expect(inspection.healthy).toBe(false);
       expect(inspection.tablesWithoutRowSecurity).toEqual(["tabla_olvidada"]);

@@ -51,9 +51,12 @@ describe("runMigrations", () => {
       "0003_collections.sql",
       "0004_accounting_and_audit.sql",
       "0005_security.sql",
+      "0006_identity.sql",
+      "0007_loan_late_fee_policy.sql",
+      "0008_prescreening.sql",
     ]);
     expect(second.applied).toEqual([]);
-    expect(second.alreadyApplied).toHaveLength(5);
+    expect(second.alreadyApplied).toHaveLength(8);
   });
 
   it("crea todas las tablas del esquema", async () => {
@@ -70,9 +73,13 @@ describe("runMigrations", () => {
         "organizations",
         "payment_allocations",
         "payments",
+        "prescreening_forms",
+        "prescreening_submissions",
         "receipt_counters",
         "receipts",
         "schema_migrations",
+        "sessions",
+        "users",
       ].sort(),
     );
   });

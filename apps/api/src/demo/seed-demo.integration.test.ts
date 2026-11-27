@@ -8,7 +8,12 @@ import { createPool } from "../shared/infrastructure/postgres/connection";
 import { PostgresDatabase } from "../shared/infrastructure/postgres/postgres-database";
 import { selectRows } from "../shared/infrastructure/postgres/sql";
 import { testDatabaseConfig } from "../testing/postgres/test-database";
-import { DEMO_ORGANIZATION_ID, seedDemo } from "./seed-demo";
+import { CreateUser } from "../modules/identity/application/create-user";
+import { PostgresUserRepository } from "../modules/identity/infrastructure/postgres/postgres-identity-repositories";
+import { ScryptPasswordHasher } from "../modules/identity/infrastructure/scrypt-password-hasher";
+import { UuidV7Generator } from "../shared/infrastructure/postgres/uuid";
+import { runStatement } from "../shared/infrastructure/postgres/sql";
+import { DEMO_ORGANIZATION_ID, ensureDemoUsers, seedDemo, upgradeDemoLateFees } from "./seed-demo";
 
 let pool: Pool;
 const cipher = new FieldCipher(randomBytes(32), randomBytes(32));
@@ -27,7 +32,7 @@ describe("seedDemo", () => {
     const result = await seedDemo(pool, cipher, clock);
 
     expect(result).toEqual({ created: true, organizationId: DEMO_ORGANIZATION_ID, loans: 6, payments: 9 });
-    const database = new PostgresDatabase(pool);
+    const database = new PostgresDatabase(pool, cipher);
     const loans = await database.repositories().loans.listByOrganization(DEMO_ORGANIZATION_ID);
     expect(loans.map((loan) => loan.status).sort()).toEqual([
       "ACTIVE",
@@ -44,7 +49,7 @@ describe("seedDemo", () => {
   });
 
   it("deja la contabilidad cuadrada y con cifras coherentes para el tablero", async () => {
-    const entries = await new PostgresDatabase(pool).repositories().ledger.entriesOf(DEMO_ORGANIZATION_ID);
+    const entries = await new PostgresDatabase(pool, cipher).repositories().ledger.entriesOf(DEMO_ORGANIZATION_ID);
     const summary = summarize(entries);
 
     expect(isBalanced(entries)).toBe(true);
@@ -71,7 +76,50 @@ describe("seedDemo", () => {
     const again = await seedDemo(pool, cipher, clock);
 
     expect(again.created).toBe(false);
-    const loans = await new PostgresDatabase(pool).repositories().loans.listByOrganization(DEMO_ORGANIZATION_ID);
+    const loans = await new PostgresDatabase(pool, cipher).repositories().loans.listByOrganization(DEMO_ORGANIZATION_ID);
     expect(loans).toHaveLength(6);
+  });
+
+  it("deja calculada la mora de los préstamos vencidos", async () => {
+    const [row] = await selectRows(
+      pool,
+      "SELECT COALESCE(SUM(late_fee_due), 0)::bigint AS total FROM installments WHERE organization_id = $1",
+      [DEMO_ORGANIZATION_ID],
+    );
+
+    expect(row!.total).toBeGreaterThan(0);
+  });
+
+  it("crea los tres usuarios de la demo una sola vez", async () => {
+    const createUser = new CreateUser({
+      users: new PostgresUserRepository(pool),
+      hasher: new ScryptPasswordHasher({ cost: 1024, blockSize: 8, parallelization: 1 }),
+      ids: new UuidV7Generator(),
+    });
+
+    const first = await ensureDemoUsers(pool, createUser, "clave-de-demo-123");
+    const second = await ensureDemoUsers(pool, createUser, "otra-clave-distinta");
+
+    expect(first.created).toHaveLength(3);
+    expect(second.created).toEqual([]);
+    expect(second.existing).toHaveLength(3);
+  });
+
+  it("actualiza una demo antigua (sin política de mora) sin tocar nada más", async () => {
+    // Se deja la demo como estaba antes de la migración 0007.
+    await runStatement(pool, "UPDATE loans SET late_fee_policy = '{\"type\":\"NONE\"}'::jsonb, grace_days = 0 WHERE organization_id = $1", [DEMO_ORGANIZATION_ID]);
+    await runStatement(pool, "UPDATE installments SET late_fee_due = 0 WHERE organization_id = $1", [DEMO_ORGANIZATION_ID]);
+
+    const upgraded = await upgradeDemoLateFees(pool, cipher, clock);
+    const again = await upgradeDemoLateFees(pool, cipher, clock);
+
+    expect(upgraded).toBe(5);
+    expect(again).toBe(0);
+    const [row] = await selectRows(
+      pool,
+      "SELECT COALESCE(SUM(late_fee_due), 0)::bigint AS total FROM installments WHERE organization_id = $1",
+      [DEMO_ORGANIZATION_ID],
+    );
+    expect(row!.total).toBeGreaterThan(0);
   });
 });

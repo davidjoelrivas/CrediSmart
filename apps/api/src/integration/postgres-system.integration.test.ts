@@ -18,14 +18,14 @@ import { PostgresDatabase } from "../shared/infrastructure/postgres/postgres-dat
 import { runStatement } from "../shared/infrastructure/postgres/sql";
 import { newUuidV7, UuidV7Generator } from "../shared/infrastructure/postgres/uuid";
 import { standardTerms } from "../testing/harness";
-import { seedOrganization, testDatabaseConfig } from "../testing/postgres/test-database";
+import { seedOrganization, testCipher, testDatabaseConfig } from "../testing/postgres/test-database";
 
 let pool: Pool;
 let database: PostgresDatabase;
 
 beforeAll(() => {
   pool = createPool(testDatabaseConfig());
-  database = new PostgresDatabase(pool);
+  database = new PostgresDatabase(pool, testCipher);
 });
 
 afterAll(async () => {
