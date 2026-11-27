@@ -2,6 +2,14 @@ import type { JournalEntry } from "@app/domain";
 import type { LedgerRepository } from "../../../modules/accounting/application/ports";
 import type { AuditLog, AuditRecord } from "../../../modules/audit/application/ports";
 import type {
+  PaymentRepository,
+  ReceiptRepository,
+  ReceiptSequence,
+  VerificationCodeGenerator,
+} from "../../../modules/collections/application/ports";
+import type { Payment } from "../../../modules/collections/domain/payment";
+import type { Receipt } from "../../../modules/collections/domain/receipt";
+import type {
   LegalCapProvider,
   LoanCodeSequence,
   LoanRepository,
@@ -15,10 +23,21 @@ interface State {
   ledger: { organizationId: string; entry: JournalEntry }[];
   audit: AuditRecord[];
   loanCounters: Map<string, number>;
+  payments: Payment[];
+  receipts: Receipt[];
+  receiptCounters: Map<string, number>;
 }
 
 function emptyState(): State {
-  return { loans: new Map(), ledger: [], audit: [], loanCounters: new Map() };
+  return {
+    loans: new Map(),
+    ledger: [],
+    audit: [],
+    loanCounters: new Map(),
+    payments: [],
+    receipts: [],
+    receiptCounters: new Map(),
+  };
 }
 
 function copyOf(state: State): State {
@@ -27,6 +46,9 @@ function copyOf(state: State): State {
     ledger: [...state.ledger],
     audit: [...state.audit],
     loanCounters: new Map(state.loanCounters),
+    payments: [...state.payments],
+    receipts: [...state.receipts],
+    receiptCounters: new Map(state.receiptCounters),
   };
 }
 
@@ -41,6 +63,9 @@ export class InMemoryDatabase {
     return {
       loans: new InMemoryLoanRepository(this),
       loanCodes: new InMemoryLoanCodeSequence(this),
+      payments: new InMemoryPaymentRepository(this),
+      receipts: new InMemoryReceiptRepository(this),
+      receiptSequence: new InMemoryReceiptSequence(this),
       ledger: new InMemoryLedgerRepository(this),
       audit: new InMemoryAuditLog(this),
     };
@@ -88,6 +113,75 @@ class InMemoryLoanCodeSequence implements LoanCodeSequence {
     const next = (this.database.state.loanCounters.get(organizationId) ?? 0) + 1;
     this.database.state.loanCounters.set(organizationId, next);
     return `PR-${String(next).padStart(4, "0")}`;
+  }
+}
+
+class InMemoryPaymentRepository implements PaymentRepository {
+  constructor(private readonly database: InMemoryDatabase) {}
+
+  async save(payment: Payment): Promise<void> {
+    this.database.state.payments.push(payment);
+  }
+
+  async findById(organizationId: string, id: string): Promise<Payment | null> {
+    return (
+      this.database.state.payments.find(
+        (payment) => payment.organizationId === organizationId && payment.id === id,
+      ) ?? null
+    );
+  }
+
+  async findByIdempotencyKey(organizationId: string, key: string): Promise<Payment | null> {
+    return (
+      this.database.state.payments.find(
+        (payment) => payment.organizationId === organizationId && payment.idempotencyKey === key,
+      ) ?? null
+    );
+  }
+
+  async findReversalOf(organizationId: string, paymentId: string): Promise<Payment | null> {
+    return (
+      this.database.state.payments.find(
+        (payment) =>
+          payment.organizationId === organizationId && payment.reversesPaymentId === paymentId,
+      ) ?? null
+    );
+  }
+
+  async listByLoan(organizationId: string, loanId: string): Promise<Payment[]> {
+    return this.database.state.payments.filter(
+      (payment) => payment.organizationId === organizationId && payment.loanId === loanId,
+    );
+  }
+}
+
+class InMemoryReceiptRepository implements ReceiptRepository {
+  constructor(private readonly database: InMemoryDatabase) {}
+
+  async save(receipt: Receipt): Promise<void> {
+    this.database.state.receipts.push(receipt);
+  }
+
+  async findByPaymentId(organizationId: string, paymentId: string): Promise<Receipt | null> {
+    return (
+      this.database.state.receipts.find(
+        (receipt) => receipt.organizationId === organizationId && receipt.paymentId === paymentId,
+      ) ?? null
+    );
+  }
+
+  async findByVerificationCode(code: string): Promise<Receipt | null> {
+    return this.database.state.receipts.find((receipt) => receipt.verificationCode === code) ?? null;
+  }
+}
+
+class InMemoryReceiptSequence implements ReceiptSequence {
+  constructor(private readonly database: InMemoryDatabase) {}
+
+  async next(organizationId: string): Promise<number> {
+    const next = (this.database.state.receiptCounters.get(organizationId) ?? 0) + 1;
+    this.database.state.receiptCounters.set(organizationId, next);
+    return next;
   }
 }
 
@@ -142,5 +236,15 @@ export class StaticLegalCap implements LegalCapProvider {
 
   async aprCapBp(): Promise<number | null> {
     return this.capBp;
+  }
+}
+
+/** Códigos de verificación predecibles para las pruebas: VERIF-000001, VERIF-000002… */
+export class SequentialVerificationCodes implements VerificationCodeGenerator {
+  private counter = 0;
+
+  newCode(): string {
+    this.counter += 1;
+    return `VERIF-${String(this.counter).padStart(6, "0")}`;
   }
 }
