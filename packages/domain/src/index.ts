@@ -18,7 +18,7 @@ export {
   validateBalance,
 } from "./installment-balance";
 export type { InstallmentBalance, InstallmentStatus, Outstanding } from "./installment-balance";
-export { allocatePayment, InvalidPaymentError } from "./payment-allocation";
+export { allocatePayment, InvalidPaymentError, reverseAllocations } from "./payment-allocation";
 export type { AllocationResult, PaymentAllocation } from "./payment-allocation";
 export { InvalidPrescreeningFormError, validatePrescreeningForm } from "./prescreening-form";
 export type {
@@ -84,3 +84,4 @@ export type {
   AprInput,
   AprPayment,
 } from "./apr";
+export { isValidIsoDate } from "./dates";

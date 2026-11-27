@@ -47,7 +47,7 @@ function byDueDateThenNumber(first: InstallmentBalance, second: InstallmentBalan
  * `unallocated`. No modifica los saldos recibidos.
  */
 export function allocatePayment(
-  balances: InstallmentBalance[],
+  balances: readonly InstallmentBalance[],
   payment: Money,
 ): AllocationResult {
   if (payment.toCents() <= 0) {
@@ -89,4 +89,39 @@ export function allocatePayment(
     balances: balances.map((balance) => updatedByNumber.get(balance.number) ?? balance),
     unallocated: remaining,
   };
+}
+
+/**
+ * Deshace la aplicación de un pago: devuelve los saldos como estaban antes de
+ * recibirlo. Falla si el pago deshecho no coincide con lo que realmente se aplicó
+ * (por ejemplo, revertir dos veces el mismo pago). No modifica los saldos recibidos.
+ */
+export function reverseAllocations(
+  balances: readonly InstallmentBalance[],
+  allocations: readonly PaymentAllocation[],
+): InstallmentBalance[] {
+  const known = new Set(balances.map((balance) => balance.number));
+  for (const allocation of allocations) {
+    if (!known.has(allocation.installmentNumber)) {
+      throw new InvalidPaymentError(
+        `El pago hace referencia a la cuota ${allocation.installmentNumber}, que no existe`,
+      );
+    }
+  }
+
+  const byNumber = new Map(allocations.map((allocation) => [allocation.installmentNumber, allocation]));
+  return balances.map((balance) => {
+    const allocation = byNumber.get(balance.number);
+    if (!allocation) {
+      return balance;
+    }
+    const restored = {
+      ...balance,
+      lateFeePaid: balance.lateFeePaid.subtract(allocation.lateFee),
+      interestPaid: balance.interestPaid.subtract(allocation.interest),
+      principalPaid: balance.principalPaid.subtract(allocation.principal),
+    };
+    validateBalance(restored);
+    return restored;
+  });
 }

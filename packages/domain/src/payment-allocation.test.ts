@@ -8,7 +8,7 @@ import {
   type InstallmentBalance,
 } from "./installment-balance";
 import { Money } from "./money";
-import { allocatePayment, InvalidPaymentError } from "./payment-allocation";
+import { allocatePayment, InvalidPaymentError, reverseAllocations } from "./payment-allocation";
 import { buildSchedule, type Frequency } from "./schedule";
 
 /** L 10,000 al 5 % mensual, 4 cuotas quincenales: cada cuota es L 2,500 de capital + L 250 de interés. */
@@ -205,6 +205,58 @@ describe("allocatePayment: propiedades", () => {
           }
         },
       ),
+    );
+  });
+});
+
+describe("reverseAllocations", () => {
+  it("devuelve los saldos exactamente como estaban antes del pago", () => {
+    const original = fourBalances();
+    const { allocations, balances } = allocatePayment(original, lempiras("4000"));
+
+    const restored = reverseAllocations(balances, allocations);
+
+    restored.forEach((balance, index) => {
+      expect(cents(outstandingOf(balance).total)).toBe(cents(outstandingOf(original[index]!).total));
+      expect(statusOf(balance)).toBe(statusOf(original[index]!));
+    });
+  });
+
+  it("no modifica los saldos que recibe", () => {
+    const { allocations, balances } = allocatePayment(fourBalances(), lempiras("2750"));
+
+    reverseAllocations(balances, allocations);
+
+    expect(statusOf(balances[0]!)).toBe("PAID");
+  });
+
+  it("no permite revertir un pago que ya fue revertido", () => {
+    const { allocations, balances } = allocatePayment(fourBalances(), lempiras("2750"));
+    const restored = reverseAllocations(balances, allocations);
+
+    expect(() => reverseAllocations(restored, allocations)).toThrow(InvalidBalanceError);
+  });
+
+  it("rechaza pagos que apuntan a cuotas que no existen", () => {
+    const { allocations } = allocatePayment(fourBalances(), lempiras("2750"));
+
+    expect(() => reverseAllocations([], allocations)).toThrow(InvalidPaymentError);
+  });
+
+  it("propiedad: aplicar y revertir cualquier pago deja los saldos como al inicio", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 1_100_000 }), (paymentCents) => {
+        const original = fourBalances();
+        const { allocations, balances } = allocatePayment(original, Money.fromCents(paymentCents));
+
+        const restored = reverseAllocations(balances, allocations);
+
+        restored.forEach((balance, index) => {
+          expect(cents(outstandingOf(balance).total)).toBe(
+            cents(outstandingOf(original[index]!).total),
+          );
+        });
+      }),
     );
   });
 });
