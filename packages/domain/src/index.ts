@@ -84,4 +84,4 @@ export type {
   AprInput,
   AprPayment,
 } from "./apr";
-export { isValidIsoDate } from "./dates";
+export { addDays, addMonths, daysBetween, isValidIsoDate } from "./dates";
