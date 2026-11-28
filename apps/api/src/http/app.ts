@@ -70,7 +70,16 @@ export async function buildApp(services: Services, overrides: Partial<AppConfig>
   registerBusinessRoutes(app, services, config);
 
   if (config.webDist) {
-    await app.register(fastifyStatic, { root: config.webDist, wildcard: false });
+    await app.register(fastifyStatic, {
+      root: config.webDist,
+      wildcard: false,
+      // Los archivos con huella (/assets) no cambian nunca y se guardan un año; la pantalla principal y el service
+      // worker se revisan siempre, para que una versión nueva llegue en la siguiente visita.
+      setHeaders(response, path) {
+        const immutable = path.replace(/\\/g, "/").includes("/assets/");
+        response.header("cache-control", immutable ? "public, max-age=31536000, immutable" : "no-cache");
+      },
+    });
   }
   app.setNotFoundHandler(async (request, reply) => {
     if (config.webDist && request.method === "GET" && !request.url.startsWith("/api/")) {

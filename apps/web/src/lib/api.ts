@@ -24,22 +24,41 @@ interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT";
   body?: unknown;
   signal?: AbortSignal;
+  /** Milisegundos máximos de espera. Con señal mala una solicitud puede quedarse colgada para siempre. */
+  timeoutMs?: number;
 }
 
+const NETWORK_MESSAGE = "No hay conexión con el servidor. Revisa tu internet e intenta de nuevo.";
+const DEFAULT_TIMEOUT_MS = 20_000;
+
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  // Si el navegador ya sabe que no hay internet, ni se intenta: así el aviso es inmediato.
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    throw new ApiError(0, "NETWORK", NETWORK_MESSAGE);
+  }
+
+  // Un temporizador corta la espera. Si la solicitud sí llegó al servidor, el reintento es seguro porque los cobros
+  // llevan clave de idempotencia: el servidor devuelve el resultado original en vez de cobrar dos veces.
+  const timeout = new AbortController();
+  const timer = setTimeout(() => timeout.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout.signal]) : timeout.signal;
+
   let response: Response;
   try {
     response = await fetch(`/api/v1${path}`, {
       method: options.method ?? "GET",
       headers: options.body === undefined ? undefined : { "content-type": "application/json" },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
+      signal,
     });
   } catch (error) {
-    if ((error as { name?: string }).name === "AbortError") {
+    // Cancelada a propósito por quien la pidió (por ejemplo, al salir de la pantalla): no es un error de red.
+    if ((error as { name?: string }).name === "AbortError" && options.signal?.aborted) {
       throw error;
     }
-    throw new ApiError(0, "NETWORK", "No hay conexión con el servidor. Revisa tu internet e intenta de nuevo.");
+    throw new ApiError(0, "NETWORK", NETWORK_MESSAGE);
+  } finally {
+    clearTimeout(timer);
   }
 
   const text = await response.text();

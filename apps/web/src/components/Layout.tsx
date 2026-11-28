@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { OfflineBanner, SyncManager } from "../lib/offline";
 import { ROLE_LABELS, labelOf } from "../lib/format";
 import { Button, Icon } from "./ui";
 
@@ -67,6 +68,8 @@ export function Layout() {
           </Button>
         </div>
         <main className="main">
+          <SyncManager />
+          <OfflineBanner />
           <Outlet />
         </main>
       </div>

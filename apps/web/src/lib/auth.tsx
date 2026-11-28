@@ -13,6 +13,30 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/**
+ * Copia del perfil (nombre, rol y permisos; nada secreto) para poder abrir la aplicación sin internet.
+ * No concede acceso: el servidor valida la sesión en cada solicitud, y la copia se borra al cerrar sesión.
+ */
+const PROFILE_KEY = "credismart.profile.v1";
+
+function saveProfile(user: SessionUser | null): void {
+  try {
+    if (user) window.localStorage.setItem(PROFILE_KEY, JSON.stringify(user));
+    else window.localStorage.removeItem(PROFILE_KEY);
+  } catch {
+    // Sin almacenamiento disponible: la aplicación funciona igual, solo que no abre sin internet.
+  }
+}
+
+function savedProfile(): SessionUser | null {
+  try {
+    const raw = window.localStorage.getItem(PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as SessionUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
   const queryClient = useQueryClient();
@@ -20,9 +44,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     api<{ user: SessionUser }>("/auth/me")
-      .then((result) => active && setUser(result.user))
+      .then((result) => {
+        saveProfile(result.user);
+        if (active) setUser(result.user);
+      })
       .catch((error: unknown) => {
-        if (active && (error instanceof ApiError ? error.status === 401 : true)) {
+        if (!active) return;
+        if (error instanceof ApiError && error.status === 0) {
+          // Sin internet al abrir: se usa la copia del perfil para que la persona pueda seguir trabajando.
+          setUser(savedProfile());
+          return;
+        }
+        if (error instanceof ApiError ? error.status === 401 : true) {
+          saveProfile(null);
           setUser(null);
         }
       });
@@ -35,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () =>
       onUnauthorized(() => {
         queryClient.clear();
+        saveProfile(null);
         setUser(null);
       }),
     [queryClient],
@@ -44,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (credentials: LoginRequest) => {
       const result = await api<{ user: SessionUser }>("/auth/login", { method: "POST", body: credentials });
       queryClient.clear();
+      saveProfile(result.user);
       setUser(result.user);
       return result.user;
     },
@@ -55,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api("/auth/logout", { method: "POST", body: {} });
     } finally {
       queryClient.clear();
+      saveProfile(null);
       setUser(null);
     }
   }, [queryClient]);

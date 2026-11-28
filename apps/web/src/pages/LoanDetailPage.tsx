@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { LoanStatusBadge } from "../components/loan-parts";
 import { Badge, Button, Card, ErrorNotice, Field, Loading, Modal, MoneyInput, PageHead, Stat, useToast } from "../components/ui";
-import { api, newIdempotencyKey } from "../lib/api";
+import { ApiError, api, newIdempotencyKey } from "../lib/api";
+import { offlineQueue } from "../lib/offline-queue";
 import { useAuth } from "../lib/auth";
 import {
   FREQUENCY_ADJECTIVES,
@@ -72,6 +73,8 @@ function PaymentModal({ loan, onClose }: { loan: LoanDetailView; onClose: () => 
   const [reference, setReference] = useState("");
   const [receivedOn, setReceivedOn] = useState(new Date().toLocaleDateString("en-CA"));
   const [done, setDone] = useState<PaymentResult | null>(null);
+  const [savedOffline, setSavedOffline] = useState(false);
+  const { user } = useAuth();
 
   const cents = parseLempiras(amount);
   const pay = useMutation({
@@ -79,12 +82,48 @@ function PaymentModal({ loan, onClose }: { loan: LoanDetailView; onClose: () => 
       api<PaymentResult>("/payments", {
         method: "POST",
         body: { loanId: loan.id, amountCents: cents, method, reference: reference || undefined, receivedOn, idempotencyKey },
+        timeoutMs: 12_000,
       }),
     onSuccess: (result) => {
       void queryClient.invalidateQueries();
       setDone(result);
     },
+    onError: (error) => {
+      // Sin internet: el cobro no se pierde. Se guarda en este equipo con la MISMA clave de idempotencia y se envía solo.
+      if (error instanceof ApiError && error.status === 0 && user && cents) {
+        offlineQueue.enqueue({
+          id: idempotencyKey,
+          userId: user.id,
+          loanId: loan.id,
+          loanCode: loan.code,
+          borrowerName: loan.borrowerName,
+          amountCents: cents,
+          method,
+          reference: reference || undefined,
+          receivedOn,
+        });
+        setSavedOffline(true);
+      }
+    },
   });
+
+  if (savedOffline) {
+    return (
+      <Modal title="Cobro guardado sin conexión" onClose={onClose}>
+        <div className="stack">
+          <div className="notice warn">
+            No hay conexión con el servidor, pero <strong>el cobro de {formatCents(cents ?? 0)} quedó guardado en este equipo</strong>. Se enviará solo cuando vuelva el internet y entonces se emite el recibo.
+          </div>
+          <p className="muted small">No lo registres de nuevo: se enviaría dos veces. Puedes ver los cobros pendientes en el aviso de arriba.</p>
+          <div className="modal-actions">
+            <Button variant="accent" onClick={onClose}>
+              Entendido
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   if (done) {
     return (
