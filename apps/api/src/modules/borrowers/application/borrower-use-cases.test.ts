@@ -90,7 +90,7 @@ describe("UpdateBorrower", () => {
 
 describe("BorrowerQueries", () => {
   it("busca por parte del nombre, por teléfono y por DNI completo", async () => {
-    const harness = createHarness();
+    const harness = createHarness({ seedBorrowers: false });
     await harness.createBorrower.execute(contextOf(), maria);
     await harness.createBorrower.execute(contextOf(), {
       ...maria,
@@ -111,7 +111,7 @@ describe("BorrowerQueries", () => {
   });
 
   it("nunca mezcla clientes de otras organizaciones", async () => {
-    const harness = createHarness();
+    const harness = createHarness({ seedBorrowers: false });
     await harness.createBorrower.execute(contextOf("org-1"), maria);
 
     expect(await harness.borrowerQueries.search(contextOf("org-2"), {})).toEqual([]);

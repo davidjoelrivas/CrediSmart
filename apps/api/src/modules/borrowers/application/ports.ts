@@ -1,4 +1,4 @@
-import type { Borrower } from "../domain/borrower";
+import type { Borrower, BorrowerStatus } from "../domain/borrower";
 
 export interface BorrowerSearch {
   /** Texto que se busca dentro del nombre o del teléfono. */
@@ -13,6 +13,8 @@ export interface BorrowerRepository {
   save(borrower: Borrower): Promise<void>;
   findById(organizationId: string, id: string): Promise<Borrower | null>;
   findByNationalId(organizationId: string, nationalId: string): Promise<Borrower | null>;
+  /** Estado del cliente dentro de la organización, o null si no existe en ella. No descifra nada. */
+  statusOf(organizationId: string, id: string): Promise<BorrowerStatus | null>;
   /** Solo los nombres, por id. No descifra el DNI: para pantallas que solo muestran quién es el cliente. */
   namesByIds(organizationId: string, ids: readonly string[]): Promise<Map<string, string>>;
   search(organizationId: string, search: BorrowerSearch): Promise<Borrower[]>;

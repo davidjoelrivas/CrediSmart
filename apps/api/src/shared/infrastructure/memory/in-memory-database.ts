@@ -195,6 +195,10 @@ class InMemoryBorrowerRepository implements BorrowerRepository {
     return this.ofOrganization(organizationId).find((borrower) => borrower.nationalId === nationalId) ?? null;
   }
 
+  async statusOf(organizationId: string, id: string): Promise<Borrower["status"] | null> {
+    return this.database.state.borrowers.get(`${organizationId}:${id}`)?.status ?? null;
+  }
+
   async namesByIds(organizationId: string, ids: readonly string[]): Promise<Map<string, string>> {
     return new Map(
       this.ofOrganization(organizationId)

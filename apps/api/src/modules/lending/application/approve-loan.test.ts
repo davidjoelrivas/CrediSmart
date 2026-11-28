@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AprCapExceededError, InvalidLoanTermsError, Money } from "@app/domain";
 import { contextOf, createHarness, standardTerms } from "../../../testing/harness";
+import { ConflictError, NotFoundError } from "../../../shared/application/errors";
 
 describe("ApproveLoan", () => {
   it("crea el préstamo pendiente de firma con su código y su plan de cuotas", async () => {
@@ -112,5 +113,39 @@ describe("ApproveLoan", () => {
       terms: standardTerms(),
     });
     expect(loan.code).toBe("PR-0001");
+  });
+});
+
+describe("ApproveLoan: el cliente debe ser de la organización y estar activo", () => {
+  it("rechaza un cliente que no existe en la organización", async () => {
+    const harness = createHarness({ seedBorrowers: false });
+    await harness.createBorrower.execute(contextOf("org-1"), {
+      fullName: "María Fernanda López",
+      nationalId: "0801199012345",
+      privacyConsent: true,
+    });
+    const [ajeno] = await harness.borrowerQueries.search(contextOf("org-1"), {});
+
+    await expect(
+      harness.approveLoan.execute(contextOf("org-2"), { borrowerId: ajeno!.id, terms: standardTerms() }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      harness.approveLoan.execute(contextOf("org-1"), { borrowerId: "no-existe", terms: standardTerms() }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("rechaza a un cliente bloqueado o inactivo", async () => {
+    const harness = createHarness({ seedBorrowers: false });
+    const view = await harness.createBorrower.execute(contextOf(), {
+      fullName: "María Fernanda López",
+      nationalId: "0801199012345",
+      privacyConsent: true,
+    });
+    await harness.updateBorrower.execute(contextOf(), { borrowerId: view.id, status: "BLOCKED" });
+
+    await expect(
+      harness.approveLoan.execute(contextOf(), { borrowerId: view.id, terms: standardTerms() }),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect(await harness.repositories.loans.listByOrganization("org-1")).toHaveLength(0);
   });
 });

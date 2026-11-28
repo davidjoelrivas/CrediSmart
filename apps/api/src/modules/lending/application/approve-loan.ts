@@ -9,6 +9,7 @@ import {
   type AprCapOverride,
   type LoanTerms,
 } from "@app/domain";
+import { ConflictError, NotFoundError } from "../../../shared/application/errors";
 import type { RequestContext, Clock, IdGenerator, UnitOfWork } from "../../../shared/application/ports";
 import type { Repositories } from "../../../shared/application/repositories";
 import { approveLoan, type Loan } from "../domain/loan";
@@ -52,6 +53,14 @@ export class ApproveLoan {
     const approvedOn = this.deps.clock.today();
 
     return this.deps.unitOfWork.run(async (repositories) => {
+      // El cliente debe existir EN ESTA organización (un id de otra organización "no existe") y estar activo.
+      const borrowerStatus = await repositories.borrowers.statusOf(context.organizationId, input.borrowerId);
+      if (borrowerStatus === null) {
+        throw new NotFoundError("Cliente", input.borrowerId);
+      }
+      if (borrowerStatus !== "ACTIVE") {
+        throw new ConflictError("El cliente no está activo y no puede recibir préstamos");
+      }
       const loan = approveLoan({
         id: this.deps.ids.newId(),
         organizationId: context.organizationId,

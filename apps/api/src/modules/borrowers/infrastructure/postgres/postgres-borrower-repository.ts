@@ -80,6 +80,15 @@ export class PostgresBorrowerRepository implements BorrowerRepository {
     return row ? this.borrowerOf(row) : null;
   }
 
+  async statusOf(organizationId: string, id: string): Promise<BorrowerStatus | null> {
+    const [row] = await selectRows(
+      this.db,
+      "SELECT status FROM borrowers WHERE organization_id = $1 AND id = $2",
+      [organizationId, id],
+    );
+    return row ? (asString(row.status) as BorrowerStatus) : null;
+  }
+
   async namesByIds(organizationId: string, ids: readonly string[]): Promise<Map<string, string>> {
     if (ids.length === 0) {
       return new Map();

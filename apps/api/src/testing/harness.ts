@@ -30,9 +30,27 @@ export function createHarness(
     today?: string;
     verificationCodes?: VerificationCodeGenerator;
     ids?: IdGenerator;
+    /** Si es falso, no se precargan los clientes de prueba (útil para probar el registro de clientes). */
+    seedBorrowers?: boolean;
   } = {},
 ) {
   const database = new InMemoryDatabase();
+  // Clientes de prueba que ya existen en las organizaciones que usan los tests.
+  for (const organizationId of options.seedBorrowers === false ? [] : ["org-1", "org-2"]) {
+    for (const id of ["b-1", "borrower-1"]) {
+      database.state.borrowers.set(`${organizationId}:${id}`, {
+        id,
+        organizationId,
+        fullName: "Cliente de prueba",
+        nationalId: "0000000000000",
+        phone: null,
+        address: null,
+        status: "ACTIVE",
+        privacyConsentOn: "2026-01-01",
+        createdOn: "2026-01-01",
+      });
+    }
+  }
   const clock = new FixedClock(options.today ?? "2026-12-01");
   const unitOfWork = new InMemoryUnitOfWork(database);
   const ids = options.ids ?? new SequentialIds("loan");
