@@ -1,0 +1,1734 @@
+{
+  "engine": "PostgreSQL 17.12",
+  "migrations": [
+    "0001_foundation.sql",
+    "0002_lending.sql",
+    "0003_collections.sql",
+    "0004_accounting_and_audit.sql",
+    "0005_security.sql",
+    "0006_identity.sql",
+    "0007_loan_late_fee_policy.sql",
+    "0008_prescreening.sql",
+    "0009_tenant_integrity.sql"
+  ],
+  "tables": [
+    {
+      "name": "audit_chain_heads",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "last_seq",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "last_hash",
+          "type": "character(64)",
+          "nullable": false,
+          "default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "audit_chain_heads_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "audit_chain_heads_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (organization_id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "audit_chain_heads_pkey",
+          "definition": "CREATE UNIQUE INDEX audit_chain_heads_pkey ON public.audit_chain_heads USING btree (organization_id)"
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "audit_log",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "seq",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "actor_id",
+          "type": "character varying(64)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "action",
+          "type": "character varying(60)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "entity",
+          "type": "character varying(40)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "entity_id",
+          "type": "character varying(64)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "event_on",
+          "type": "date",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "details",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "prev_hash",
+          "type": "character(64)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "row_hash",
+          "type": "character(64)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "audit_log_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "audit_log_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "uq_audit_org_seq",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (organization_id, seq)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "audit_log_pkey",
+          "definition": "CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)"
+        },
+        {
+          "name": "ix_audit_entity",
+          "definition": "CREATE INDEX ix_audit_entity ON public.audit_log USING btree (organization_id, entity, entity_id)"
+        },
+        {
+          "name": "uq_audit_org_seq",
+          "definition": "CREATE UNIQUE INDEX uq_audit_org_seq ON public.audit_log USING btree (organization_id, seq)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_audit_immutable",
+          "definition": "CREATE TRIGGER trg_audit_immutable BEFORE DELETE OR UPDATE ON public.audit_log FOR EACH ROW EXECUTE FUNCTION prevent_modification()"
+        }
+      ]
+    },
+    {
+      "name": "borrowers",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "full_name",
+          "type": "character varying(200)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "national_id_enc",
+          "type": "bytea",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "national_id_hash",
+          "type": "character(64)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "phone",
+          "type": "character varying(30)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "address",
+          "type": "character varying(300)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "status",
+          "type": "character varying(20)",
+          "nullable": false,
+          "default": "'ACTIVE'::character varying"
+        },
+        {
+          "name": "privacy_consent_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_borrowers_status",
+          "kind": "CHECK",
+          "definition": "CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'INACTIVE'::character varying, 'BLOCKED'::character varying])::text[])))"
+        },
+        {
+          "name": "borrowers_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "borrowers_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "uq_borrowers_org_id",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (organization_id, id)"
+        },
+        {
+          "name": "uq_borrowers_org_idhash",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (organization_id, national_id_hash)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "borrowers_pkey",
+          "definition": "CREATE UNIQUE INDEX borrowers_pkey ON public.borrowers USING btree (id)"
+        },
+        {
+          "name": "ix_borrowers_org_name",
+          "definition": "CREATE INDEX ix_borrowers_org_name ON public.borrowers USING btree (organization_id, full_name)"
+        },
+        {
+          "name": "uq_borrowers_org_id",
+          "definition": "CREATE UNIQUE INDEX uq_borrowers_org_id ON public.borrowers USING btree (organization_id, id)"
+        },
+        {
+          "name": "uq_borrowers_org_idhash",
+          "definition": "CREATE UNIQUE INDEX uq_borrowers_org_idhash ON public.borrowers USING btree (organization_id, national_id_hash)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_borrowers_touch",
+          "definition": "CREATE TRIGGER trg_borrowers_touch BEFORE UPDATE ON public.borrowers FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+        }
+      ]
+    },
+    {
+      "name": "installments",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "loan_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "number",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "principal_due",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "interest_due",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "late_fee_due",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "principal_paid",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "interest_paid",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "late_fee_paid",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_installments_amounts",
+          "kind": "CHECK",
+          "definition": "CHECK (((principal_due >= 0) AND (interest_due >= 0) AND (late_fee_due >= 0) AND (principal_paid >= 0) AND (interest_paid >= 0) AND (late_fee_paid >= 0) AND (principal_paid <= principal_due) AND (interest_paid <= interest_due) AND (late_fee_paid <= late_fee_due)))"
+        },
+        {
+          "name": "installments_loan_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (loan_id) REFERENCES loans(id)"
+        },
+        {
+          "name": "installments_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (loan_id, number)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "installments_pkey",
+          "definition": "CREATE UNIQUE INDEX installments_pkey ON public.installments USING btree (loan_id, number)"
+        },
+        {
+          "name": "ix_installments_org_due",
+          "definition": "CREATE INDEX ix_installments_org_due ON public.installments USING btree (organization_id, due_date)"
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "journal_entries",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "entry_date",
+          "type": "date",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "description",
+          "type": "character varying(300)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "journal_entries_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "journal_entries_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_journal_entries_org",
+          "definition": "CREATE INDEX ix_journal_entries_org ON public.journal_entries USING btree (organization_id, id)"
+        },
+        {
+          "name": "ix_journal_entries_org_date",
+          "definition": "CREATE INDEX ix_journal_entries_org_date ON public.journal_entries USING btree (organization_id, entry_date)"
+        },
+        {
+          "name": "journal_entries_pkey",
+          "definition": "CREATE UNIQUE INDEX journal_entries_pkey ON public.journal_entries USING btree (id)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_journal_entries_immutable",
+          "definition": "CREATE TRIGGER trg_journal_entries_immutable BEFORE DELETE OR UPDATE ON public.journal_entries FOR EACH ROW EXECUTE FUNCTION prevent_modification()"
+        }
+      ]
+    },
+    {
+      "name": "journal_lines",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "entry_id",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "line_number",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "account_code",
+          "type": "character varying(10)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "debit",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "credit",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "loan_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_journal_lines_one_side",
+          "kind": "CHECK",
+          "definition": "CHECK ((((debit > 0) AND (credit = 0)) OR ((credit > 0) AND (debit = 0))))"
+        },
+        {
+          "name": "journal_lines_entry_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (entry_id) REFERENCES journal_entries(id)"
+        },
+        {
+          "name": "journal_lines_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (entry_id, line_number)"
+        },
+        {
+          "name": "trg_journal_lines_balanced",
+          "kind": "t",
+          "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_journal_lines_account",
+          "definition": "CREATE INDEX ix_journal_lines_account ON public.journal_lines USING btree (account_code)"
+        },
+        {
+          "name": "ix_journal_lines_loan",
+          "definition": "CREATE INDEX ix_journal_lines_loan ON public.journal_lines USING btree (loan_id)"
+        },
+        {
+          "name": "journal_lines_pkey",
+          "definition": "CREATE UNIQUE INDEX journal_lines_pkey ON public.journal_lines USING btree (entry_id, line_number)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_journal_lines_balanced",
+          "definition": "CREATE CONSTRAINT TRIGGER trg_journal_lines_balanced AFTER INSERT ON public.journal_lines DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_entry_balanced()"
+        },
+        {
+          "name": "trg_journal_lines_immutable",
+          "definition": "CREATE TRIGGER trg_journal_lines_immutable BEFORE DELETE OR UPDATE ON public.journal_lines FOR EACH ROW EXECUTE FUNCTION prevent_modification()"
+        }
+      ]
+    },
+    {
+      "name": "loan_counters",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "last_number",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "loan_counters_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "loan_counters_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (organization_id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "loan_counters_pkey",
+          "definition": "CREATE UNIQUE INDEX loan_counters_pkey ON public.loan_counters USING btree (organization_id)"
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "loans",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "borrower_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "code",
+          "type": "character varying(20)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "principal",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "rate_bp",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "rate_period",
+          "type": "character varying(10)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "payment_frequency",
+          "type": "character varying(10)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "installments_count",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "interest_method",
+          "type": "character varying(15)",
+          "nullable": false,
+          "default": "'FLAT'::character varying"
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "apr_bp",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "apr_cap_override_reason",
+          "type": "character varying(300)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "status",
+          "type": "character varying(20)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "approved_on",
+          "type": "date",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "disbursed_on",
+          "type": "date",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "closed_on",
+          "type": "date",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "late_fee_policy",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{\"type\": \"NONE\"}'::jsonb"
+        },
+        {
+          "name": "grace_days",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_loans_count",
+          "kind": "CHECK",
+          "definition": "CHECK ((installments_count > 0))"
+        },
+        {
+          "name": "ck_loans_frequency",
+          "kind": "CHECK",
+          "definition": "CHECK (((payment_frequency)::text = ANY ((ARRAY['WEEKLY'::character varying, 'BIWEEKLY'::character varying, 'MONTHLY'::character varying])::text[])))"
+        },
+        {
+          "name": "ck_loans_grace_days",
+          "kind": "CHECK",
+          "definition": "CHECK ((grace_days >= 0))"
+        },
+        {
+          "name": "ck_loans_late_fee_policy",
+          "kind": "CHECK",
+          "definition": "CHECK (((late_fee_policy ->> 'type'::text) = ANY (ARRAY['NONE'::text, 'PERCENT_OF_OVERDUE'::text, 'FIXED_PER_DAY'::text, 'PERCENT_PER_DAY'::text])))"
+        },
+        {
+          "name": "ck_loans_method",
+          "kind": "CHECK",
+          "definition": "CHECK (((interest_method)::text = ANY ((ARRAY['FLAT'::character varying, 'DECLINING'::character varying, 'INTEREST_ONLY'::character varying])::text[])))"
+        },
+        {
+          "name": "ck_loans_principal",
+          "kind": "CHECK",
+          "definition": "CHECK ((principal > 0))"
+        },
+        {
+          "name": "ck_loans_rate",
+          "kind": "CHECK",
+          "definition": "CHECK ((rate_bp >= 0))"
+        },
+        {
+          "name": "ck_loans_rate_period",
+          "kind": "CHECK",
+          "definition": "CHECK (((rate_period)::text = ANY ((ARRAY['WEEKLY'::character varying, 'BIWEEKLY'::character varying, 'MONTHLY'::character varying])::text[])))"
+        },
+        {
+          "name": "ck_loans_status",
+          "kind": "CHECK",
+          "definition": "CHECK (((status)::text = ANY ((ARRAY['PENDING_SIGNATURE'::character varying, 'ACTIVE'::character varying, 'PAID_OFF'::character varying, 'WRITTEN_OFF'::character varying, 'CANCELLED'::character varying])::text[])))"
+        },
+        {
+          "name": "fk_loans_borrower_same_org",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id, borrower_id) REFERENCES borrowers(organization_id, id)"
+        },
+        {
+          "name": "loans_borrower_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (borrower_id) REFERENCES borrowers(id)"
+        },
+        {
+          "name": "loans_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "loans_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "uq_loans_org_code",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (organization_id, code)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_loans_org_borrower",
+          "definition": "CREATE INDEX ix_loans_org_borrower ON public.loans USING btree (organization_id, borrower_id)"
+        },
+        {
+          "name": "ix_loans_org_status",
+          "definition": "CREATE INDEX ix_loans_org_status ON public.loans USING btree (organization_id, status)"
+        },
+        {
+          "name": "loans_pkey",
+          "definition": "CREATE UNIQUE INDEX loans_pkey ON public.loans USING btree (id)"
+        },
+        {
+          "name": "uq_loans_org_code",
+          "definition": "CREATE UNIQUE INDEX uq_loans_org_code ON public.loans USING btree (organization_id, code)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_loans_touch",
+          "definition": "CREATE TRIGGER trg_loans_touch BEFORE UPDATE ON public.loans FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+        }
+      ]
+    },
+    {
+      "name": "organizations",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "name",
+          "type": "character varying(160)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "currency",
+          "type": "character(3)",
+          "nullable": false,
+          "default": "'HNL'::bpchar"
+        },
+        {
+          "name": "timezone",
+          "type": "character varying(40)",
+          "nullable": false,
+          "default": "'America/Tegucigalpa'::character varying"
+        },
+        {
+          "name": "legal_apr_cap_bp",
+          "type": "bigint",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "slug",
+          "type": "character varying(60)",
+          "nullable": true,
+          "default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_organizations_cap",
+          "kind": "CHECK",
+          "definition": "CHECK (((legal_apr_cap_bp IS NULL) OR (legal_apr_cap_bp >= 0)))"
+        },
+        {
+          "name": "ck_organizations_slug",
+          "kind": "CHECK",
+          "definition": "CHECK (((slug)::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text))"
+        },
+        {
+          "name": "organizations_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "organizations_pkey",
+          "definition": "CREATE UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)"
+        },
+        {
+          "name": "uq_organizations_slug",
+          "definition": "CREATE UNIQUE INDEX uq_organizations_slug ON public.organizations USING btree (slug) WHERE (slug IS NOT NULL)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_organizations_touch",
+          "definition": "CREATE TRIGGER trg_organizations_touch BEFORE UPDATE ON public.organizations FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+        }
+      ]
+    },
+    {
+      "name": "payment_allocations",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "payment_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "installment_number",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "late_fee",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "interest",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "principal",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_allocations_amounts",
+          "kind": "CHECK",
+          "definition": "CHECK (((late_fee >= 0) AND (interest >= 0) AND (principal >= 0)))"
+        },
+        {
+          "name": "payment_allocations_payment_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (payment_id) REFERENCES payments(id)"
+        },
+        {
+          "name": "payment_allocations_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (payment_id, installment_number)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "payment_allocations_pkey",
+          "definition": "CREATE UNIQUE INDEX payment_allocations_pkey ON public.payment_allocations USING btree (payment_id, installment_number)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_allocations_immutable",
+          "definition": "CREATE TRIGGER trg_allocations_immutable BEFORE DELETE OR UPDATE ON public.payment_allocations FOR EACH ROW EXECUTE FUNCTION prevent_modification()"
+        }
+      ]
+    },
+    {
+      "name": "payments",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "loan_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "amount",
+          "type": "bigint",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "method",
+          "type": "character varying(10)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "reference",
+          "type": "character varying(80)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "received_on",
+          "type": "date",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "received_by",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "idempotency_key",
+          "type": "character varying(80)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "reverses_payment_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "reversal_reason",
+          "type": "character varying(300)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_payments_amount",
+          "kind": "CHECK",
+          "definition": "CHECK ((((reverses_payment_id IS NULL) AND (amount > 0)) OR ((reverses_payment_id IS NOT NULL) AND (amount < 0) AND (reversal_reason IS NOT NULL))))"
+        },
+        {
+          "name": "ck_payments_method",
+          "kind": "CHECK",
+          "definition": "CHECK (((method)::text = ANY ((ARRAY['CASH'::character varying, 'TRANSFER'::character varying, 'DEPOSIT'::character varying])::text[])))"
+        },
+        {
+          "name": "payments_loan_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (loan_id) REFERENCES loans(id)"
+        },
+        {
+          "name": "payments_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "payments_reverses_payment_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (reverses_payment_id) REFERENCES payments(id)"
+        },
+        {
+          "name": "payments_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "uq_payments_idempotency",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (organization_id, idempotency_key)"
+        },
+        {
+          "name": "uq_payments_reverses",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (reverses_payment_id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_payments_loan",
+          "definition": "CREATE INDEX ix_payments_loan ON public.payments USING btree (organization_id, loan_id, received_on)"
+        },
+        {
+          "name": "payments_pkey",
+          "definition": "CREATE UNIQUE INDEX payments_pkey ON public.payments USING btree (id)"
+        },
+        {
+          "name": "uq_payments_idempotency",
+          "definition": "CREATE UNIQUE INDEX uq_payments_idempotency ON public.payments USING btree (organization_id, idempotency_key)"
+        },
+        {
+          "name": "uq_payments_reverses",
+          "definition": "CREATE UNIQUE INDEX uq_payments_reverses ON public.payments USING btree (reverses_payment_id)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_payments_immutable",
+          "definition": "CREATE TRIGGER trg_payments_immutable BEFORE DELETE OR UPDATE ON public.payments FOR EACH ROW EXECUTE FUNCTION prevent_modification()"
+        }
+      ]
+    },
+    {
+      "name": "prescreening_forms",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "definition",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_prescreening_forms_version",
+          "kind": "CHECK",
+          "definition": "CHECK ((version >= 1))"
+        },
+        {
+          "name": "prescreening_forms_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "prescreening_forms_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (organization_id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "prescreening_forms_pkey",
+          "definition": "CREATE UNIQUE INDEX prescreening_forms_pkey ON public.prescreening_forms USING btree (organization_id)"
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "prescreening_submissions",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "form_version",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "applicant_name",
+          "type": "character varying(160)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "phone",
+          "type": "character varying(30)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "answers",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "outcome",
+          "type": "character varying(20)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "score",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "reasons",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "status",
+          "type": "character varying(20)",
+          "nullable": false,
+          "default": "'NEW'::character varying"
+        },
+        {
+          "name": "decision",
+          "type": "character varying(20)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "decision_note",
+          "type": "character varying(500)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "decided_by",
+          "type": "character varying(64)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "decided_on",
+          "type": "date",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "contradicts_outcome",
+          "type": "boolean",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_prescreening_decided",
+          "kind": "CHECK",
+          "definition": "CHECK (((((status)::text = 'NEW'::text) AND (decision IS NULL)) OR (((status)::text = 'DECIDED'::text) AND (decision IS NOT NULL) AND (decided_by IS NOT NULL) AND (decided_on IS NOT NULL))))"
+        },
+        {
+          "name": "ck_prescreening_decision",
+          "kind": "CHECK",
+          "definition": "CHECK (((decision IS NULL) OR ((decision)::text = ANY ((ARRAY['CONTINUE'::character varying, 'DISCARD'::character varying])::text[]))))"
+        },
+        {
+          "name": "ck_prescreening_outcome",
+          "kind": "CHECK",
+          "definition": "CHECK (((outcome)::text = ANY ((ARRAY['APPLIES'::character varying, 'REVIEW'::character varying, 'NOT_APPLIES'::character varying])::text[])))"
+        },
+        {
+          "name": "ck_prescreening_status",
+          "kind": "CHECK",
+          "definition": "CHECK (((status)::text = ANY ((ARRAY['NEW'::character varying, 'DECIDED'::character varying])::text[])))"
+        },
+        {
+          "name": "prescreening_submissions_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "prescreening_submissions_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_prescreening_org_status",
+          "definition": "CREATE INDEX ix_prescreening_org_status ON public.prescreening_submissions USING btree (organization_id, status, created_at DESC)"
+        },
+        {
+          "name": "prescreening_submissions_pkey",
+          "definition": "CREATE UNIQUE INDEX prescreening_submissions_pkey ON public.prescreening_submissions USING btree (id)"
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "receipt_counters",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "last_number",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "receipt_counters_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "receipt_counters_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (organization_id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "receipt_counters_pkey",
+          "definition": "CREATE UNIQUE INDEX receipt_counters_pkey ON public.receipt_counters USING btree (organization_id)"
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "receipts",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "payment_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "folio",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "verification_code",
+          "type": "character varying(40)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "issued_on",
+          "type": "date",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "receipts_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "receipts_payment_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (payment_id) REFERENCES payments(id)"
+        },
+        {
+          "name": "receipts_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "uq_receipts_code",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (verification_code)"
+        },
+        {
+          "name": "uq_receipts_org_folio",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (organization_id, folio)"
+        },
+        {
+          "name": "uq_receipts_payment",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (payment_id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "receipts_pkey",
+          "definition": "CREATE UNIQUE INDEX receipts_pkey ON public.receipts USING btree (id)"
+        },
+        {
+          "name": "uq_receipts_code",
+          "definition": "CREATE UNIQUE INDEX uq_receipts_code ON public.receipts USING btree (verification_code)"
+        },
+        {
+          "name": "uq_receipts_org_folio",
+          "definition": "CREATE UNIQUE INDEX uq_receipts_org_folio ON public.receipts USING btree (organization_id, folio)"
+        },
+        {
+          "name": "uq_receipts_payment",
+          "definition": "CREATE UNIQUE INDEX uq_receipts_payment ON public.receipts USING btree (payment_id)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_receipts_immutable",
+          "definition": "CREATE TRIGGER trg_receipts_immutable BEFORE DELETE OR UPDATE ON public.receipts FOR EACH ROW EXECUTE FUNCTION prevent_modification()"
+        }
+      ]
+    },
+    {
+      "name": "schema_migrations",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "version",
+          "type": "character varying(10)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "name",
+          "type": "character varying(160)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "checksum",
+          "type": "character(64)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "applied_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "schema_migrations_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (version)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "schema_migrations_pkey",
+          "definition": "CREATE UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (version)"
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "sessions",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "token_hash",
+          "type": "character(64)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "user_agent",
+          "type": "character varying(200)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "ip",
+          "type": "character varying(45)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "sessions_user_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (user_id) REFERENCES users(id)"
+        },
+        {
+          "name": "sessions_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "uq_sessions_token",
+          "kind": "UNIQUE",
+          "definition": "UNIQUE (token_hash)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_sessions_user",
+          "definition": "CREATE INDEX ix_sessions_user ON public.sessions USING btree (user_id)"
+        },
+        {
+          "name": "sessions_pkey",
+          "definition": "CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)"
+        },
+        {
+          "name": "uq_sessions_token",
+          "definition": "CREATE UNIQUE INDEX uq_sessions_token ON public.sessions USING btree (token_hash)"
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "users",
+      "rowSecurity": true,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "role",
+          "type": "character varying(20)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "full_name",
+          "type": "character varying(160)",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "email",
+          "type": "character varying(190)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "phone",
+          "type": "character varying(30)",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "password_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "borrower_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "status",
+          "type": "character varying(20)",
+          "nullable": false,
+          "default": "'ACTIVE'::character varying"
+        },
+        {
+          "name": "failed_logins",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "locked_until",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "last_login_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_users_client_borrower",
+          "kind": "CHECK",
+          "definition": "CHECK ((((role)::text = 'CLIENT'::text) = (borrower_id IS NOT NULL)))"
+        },
+        {
+          "name": "ck_users_identifier",
+          "kind": "CHECK",
+          "definition": "CHECK (((email IS NOT NULL) OR (phone IS NOT NULL)))"
+        },
+        {
+          "name": "ck_users_role",
+          "kind": "CHECK",
+          "definition": "CHECK (((role)::text = ANY ((ARRAY['OWNER'::character varying, 'COLLECTOR'::character varying, 'ACCOUNTANT'::character varying, 'CLIENT'::character varying])::text[])))"
+        },
+        {
+          "name": "ck_users_status",
+          "kind": "CHECK",
+          "definition": "CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'DISABLED'::character varying])::text[])))"
+        },
+        {
+          "name": "fk_users_borrower_same_org",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id, borrower_id) REFERENCES borrowers(organization_id, id)"
+        },
+        {
+          "name": "users_borrower_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (borrower_id) REFERENCES borrowers(id)"
+        },
+        {
+          "name": "users_organization_id_fkey",
+          "kind": "FOREIGN KEY",
+          "definition": "FOREIGN KEY (organization_id) REFERENCES organizations(id)"
+        },
+        {
+          "name": "users_pkey",
+          "kind": "PRIMARY KEY",
+          "definition": "PRIMARY KEY (id)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_users_org",
+          "definition": "CREATE INDEX ix_users_org ON public.users USING btree (organization_id, role)"
+        },
+        {
+          "name": "uq_users_email",
+          "definition": "CREATE UNIQUE INDEX uq_users_email ON public.users USING btree (lower((email)::text)) WHERE (email IS NOT NULL)"
+        },
+        {
+          "name": "uq_users_phone",
+          "definition": "CREATE UNIQUE INDEX uq_users_phone ON public.users USING btree (phone) WHERE (phone IS NOT NULL)"
+        },
+        {
+          "name": "users_pkey",
+          "definition": "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_users_touch",
+          "definition": "CREATE TRIGGER trg_users_touch BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION touch_updated_at()"
+        }
+      ]
+    }
+  ]
+}
