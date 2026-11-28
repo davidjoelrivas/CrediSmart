@@ -656,3 +656,103 @@ describe("precalificación registrada por el prestamista", () => {
     expect((await app.inject({ method: "POST", url: "/api/v1/prescreening", payload: {} })).statusCode).toBe(401);
   });
 });
+
+describe("aislamiento entre organizaciones (acceso indebido)", () => {
+  const OTHER_ORGANIZATION = "01900000-0000-7000-8000-000000000002";
+
+  async function otherOwner(): Promise<string> {
+    await system.services.createUser.execute({
+      organizationId: OTHER_ORGANIZATION,
+      role: "OWNER",
+      fullName: "Dueño de otra organización",
+      email: "otro@ejemplo.com",
+      password: PASSWORD,
+    });
+    return loginAs("otro@ejemplo.com");
+  }
+
+  it("una organización no puede ver, cambiar ni descargar nada de otra", async () => {
+    const owner = await asOwner();
+    const { borrower, loanId } = await activeLoan(owner);
+    const payment = (
+      await call(owner, "POST", "/api/v1/payments", { loanId, amountCents: 100_000, method: "CASH", idempotencyKey: "aislamiento-0001" })
+    ).json();
+    const intruder = await otherOwner();
+
+    const attempts = await Promise.all([
+      call(intruder, "GET", `/api/v1/loans/${loanId}`),
+      call(intruder, "GET", `/api/v1/borrowers/${borrower.id}`),
+      call(intruder, "PATCH", `/api/v1/borrowers/${borrower.id}`, { status: "BLOCKED" }),
+      call(intruder, "GET", `/api/v1/loans/${loanId}/contract.pdf`),
+      call(intruder, "POST", `/api/v1/loans/${loanId}/disburse`, { method: "CASH" }),
+      call(intruder, "POST", "/api/v1/payments", { loanId, amountCents: 1000, method: "CASH", idempotencyKey: "intruso-0000001" }),
+      call(intruder, "GET", `/api/v1/payments/${payment.paymentId}/receipt`),
+      call(intruder, "GET", `/api/v1/payments/${payment.paymentId}/receipt.pdf`),
+      call(intruder, "POST", `/api/v1/payments/${payment.paymentId}/reverse`, { reason: "Intento de anular un pago ajeno" }),
+    ]);
+
+    expect(attempts.map((response) => response.statusCode)).toEqual(Array(attempts.length).fill(404));
+    // Nada cambió en la organización víctima.
+    const detail = (await call(owner, "GET", `/api/v1/loans/${loanId}`)).json().loan;
+    expect(detail.status).toBe("ACTIVE");
+    expect(detail.payments).toHaveLength(1);
+    expect((await call(owner, "GET", `/api/v1/borrowers/${borrower.id}`)).json().borrower.status).toBe("ACTIVE");
+  });
+
+  it("los listados, el tablero y la bitácora de la otra organización salen vacíos", async () => {
+    const owner = await asOwner();
+    await activeLoan(owner);
+    const intruder = await otherOwner();
+
+    expect((await call(intruder, "GET", "/api/v1/loans")).json().loans).toEqual([]);
+    expect((await call(intruder, "GET", "/api/v1/borrowers")).json().borrowers).toEqual([]);
+    const dashboard = (await call(intruder, "GET", "/api/v1/dashboard")).json();
+    expect(dashboard.loans.total).toBe(0);
+    expect(dashboard.capital.portfolioCents).toBe(0);
+    expect((await call(intruder, "GET", "/api/v1/audit")).json().records).toEqual([]);
+    expect((await call(intruder, "GET", "/api/v1/users")).json().users).toHaveLength(1);
+  });
+
+  it("no se puede aprobar un préstamo a un cliente de otra organización ni ver su solicitud de precalificación", async () => {
+    const owner = await asOwner();
+    const { borrower } = await activeLoan(owner);
+    system.harness.database.slugs.set("mi-negocio", ORGANIZATION);
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/public/apply/mi-negocio",
+      payload: {
+        applicantName: "Juan Carlos Pérez",
+        phone: "9911-2233",
+        answers: { tieneIngresoFijo: true, montoSolicitado: 8000, deudaAtrasada: false, mesesEnTrabajo: 24, tieneReferencia: true },
+        privacyConsent: true,
+      },
+    });
+    const [submission] = (await call(owner, "GET", "/api/v1/prescreening")).json().submissions;
+    const intruder = await otherOwner();
+
+    const loan = await call(intruder, "POST", "/api/v1/loans", { borrowerId: borrower.id, terms });
+    const detail = await call(intruder, "GET", `/api/v1/prescreening/${submission.id}`);
+    const decide = await call(intruder, "POST", `/api/v1/prescreening/${submission.id}/decision`, { decision: "DISCARD" });
+
+    // El préstamo se rechaza (cliente inexistente para esa organización) y la solicitud ajena "no existe".
+    expect([404, 409, 422]).toContain(loan.statusCode);
+    expect(detail.statusCode).toBe(404);
+    expect(decide.statusCode).toBe(404);
+  });
+
+  it("una sesión no sirve para otra persona: el rol y la organización salen de la base, no de lo que envía el cliente", async () => {
+    const owner = await asOwner();
+    const intruder = await otherOwner();
+
+    const me = (await call(intruder, "GET", "/api/v1/auth/me")).json().user;
+    const forged = await app.inject({
+      method: "GET",
+      url: "/api/v1/loans",
+      headers: { cookie: `${SESSION_COOKIE}=token-inventado`, "x-organization-id": ORGANIZATION },
+    });
+
+    expect(me.fullName).toBe("Dueño de otra organización");
+    expect(forged.statusCode).toBe(401);
+    expect((await call(owner, "GET", "/api/v1/auth/me")).json().user.fullName).toBe("Usuario OWNER");
+  });
+});
