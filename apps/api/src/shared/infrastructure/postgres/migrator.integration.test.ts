@@ -54,9 +54,10 @@ describe("runMigrations", () => {
       "0006_identity.sql",
       "0007_loan_late_fee_policy.sql",
       "0008_prescreening.sql",
+      "0009_tenant_integrity.sql",
     ]);
     expect(second.applied).toEqual([]);
-    expect(second.alreadyApplied).toHaveLength(8);
+    expect(second.alreadyApplied).toHaveLength(9);
   });
 
   it("crea todas las tablas del esquema", async () => {
