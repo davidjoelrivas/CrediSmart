@@ -15,5 +15,8 @@
     "test": "pnpm -r --if-present test",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^5.1.2"
   }
 }

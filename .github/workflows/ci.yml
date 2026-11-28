@@ -1,0 +1,79 @@
+name: CI
+
+# Corre en cada pull request y en cada push a main: tipos, pruebas con cobertura, pruebas de integración
+# contra un PostgreSQL real y la compilación de la aplicación web.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Las pruebas de integración solo aceptan un PostgreSQL local (esta protección evita tocar producción).
+      POSTGRES_ADMIN_URL: postgres://postgres@127.0.0.1:5432/postgres
+      # Vacío si el secreto no existe: entonces el paso de SonarCloud se omite.
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Tipos (TypeScript)
+        run: pnpm -r --if-present typecheck
+
+      - name: Pruebas unitarias con cobertura
+        run: pnpm -r --if-present test:coverage
+
+      - name: Pruebas de integración (PostgreSQL real)
+        run: pnpm --filter @app/api test:integration
+
+      - name: Compilar la aplicación web
+        run: pnpm --filter @app/web build
+
+      - name: Guardar informes de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: |
+            packages/*/coverage/lcov.info
+            apps/*/coverage/lcov.info
+          if-no-files-found: ignore
+
+      # Análisis de calidad (SonarCloud): solo corre si el repositorio tiene el secreto SONAR_TOKEN configurado.
+      - name: SonarCloud
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@v5
