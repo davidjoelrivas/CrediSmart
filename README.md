@@ -1,4 +1,4 @@
-# Credit Smart
+# CrediSmart
 
 Sistema de gestión de préstamos para prestamistas independientes. Acompaña el ciclo completo del crédito: desde que una persona pide un préstamo (pre-calificación) hasta que termina de pagarlo (contrato, plan de pagos, recibos, mora y control del capital).
 
@@ -19,7 +19,7 @@ Un prestamista independiente de Honduras, con cerca de un año de operación y u
 
 ## La solución
 
-Credit Smart convierte ese proceso manual en un flujo de trabajo completo, y no solo en una hoja de cálculo:
+CrediSmart convierte ese proceso manual en un flujo de trabajo completo, y no solo en una hoja de cálculo:
 
 1. **Evaluación.** El interesado responde las preguntas de pre-calificación desde su teléfono (o el prestamista las registra desde el chat). El sistema aplica reglas configurables y devuelve un resultado orientativo (aplica, revisar o no aplica) con las razones. **La decisión final siempre es humana.**
 2. **Aprobación.** El prestamista define monto, interés, frecuencia y plazo. El sistema genera el plan de pagos y el contrato ya llenado con los datos del cliente.
@@ -59,7 +59,7 @@ pnpm test
 | Lenguaje | TypeScript (frontend y backend) |
 | Frontend | React + Vite, PWA con modo offline |
 | Backend | NestJS, arquitectura hexagonal, monolito modular |
-| Base de datos | MySQL 8.4 con SQL escrito a mano (sin ORM) |
+| Base de datos | PostgreSQL con SQL escrito a mano (sin ORM) |
 | Pruebas | Vitest, fast-check (propiedades), Testcontainers, Playwright |
 | Calidad y CI | ESLint, SonarCloud, GitHub Actions |
 
