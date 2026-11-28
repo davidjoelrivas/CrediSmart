@@ -1,5 +1,5 @@
 import type { InstantClock } from "../../../shared/application/ports";
-import { hashSessionToken } from "../infrastructure/session-token";
+import { hashSessionToken } from "./session-token";
 import type { SessionRepository } from "./ports";
 
 /** Cierra la sesión: el token deja de servir aunque alguien lo hubiera copiado. */

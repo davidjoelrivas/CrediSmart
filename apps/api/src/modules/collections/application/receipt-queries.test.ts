@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { NotFoundError } from "../../../shared/application/errors";
 import { contextOf, createHarness, standardTerms } from "../../../testing/harness";
 import { ReceiptQueries, borrowerHintOf } from "./receipt-queries";
-import { longDate, renderReceiptPdf, verificationUrl } from "../infrastructure/receipt-pdf";
+import { renderReceiptPdf, verificationUrl } from "../infrastructure/receipt-pdf";
+import { longDate } from "../../../shared/infrastructure/spanish-dates";
 
 async function paidLoan() {
   const harness = createHarness({ today: "2026-12-01" });

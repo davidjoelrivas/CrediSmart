@@ -1,7 +1,7 @@
 import { UnauthorizedError } from "../../../shared/application/errors";
 import type { InstantClock } from "../../../shared/application/ports";
 import type { Role } from "../domain/user";
-import { hashSessionToken } from "../infrastructure/session-token";
+import { hashSessionToken } from "./session-token";
 import type { SessionRepository, UserRepository } from "./ports";
 
 /** La persona que hace una solicitud, ya verificada. */

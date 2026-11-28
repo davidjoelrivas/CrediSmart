@@ -1,6 +1,6 @@
 import { lempirasInWords, Money } from "@app/domain";
 import PDFDocument from "pdfkit";
-import { longDate } from "../../collections/infrastructure/receipt-pdf";
+import { longDate } from "../../../shared/infrastructure/spanish-dates";
 import type { ContractData } from "../application/contract-queries";
 
 const FREQUENCY_TEXT: Record<string, { plural: string; period: string }> = {

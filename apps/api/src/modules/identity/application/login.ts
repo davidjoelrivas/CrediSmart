@@ -1,7 +1,7 @@
 import { UnauthorizedError } from "../../../shared/application/errors";
 import type { IdGenerator, InstantClock } from "../../../shared/application/ports";
 import { InvalidUserError, parseLoginIdentifier, type LoginIdentifier, type User } from "../domain/user";
-import { newSessionToken } from "../infrastructure/session-token";
+import { newSessionToken } from "./session-token";
 import type { LockoutPolicy, PasswordHasher, SessionRepository, UserRepository } from "./ports";
 
 export const DEFAULT_LOCKOUT: LockoutPolicy = { maxAttempts: 5, lockMinutes: 15 };

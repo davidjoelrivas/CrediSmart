@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
+import { longDate } from "../../../shared/infrastructure/spanish-dates";
 import type { ReceiptView } from "../application/receipt-queries";
 
 const METHOD_LABELS: Record<string, string> = {
@@ -14,17 +15,6 @@ function lempiras(cents: number): string {
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return `${sign}L ${whole}.${String(absolute % 100).padStart(2, "0")}`;
-}
-
-const MONTHS = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-
-/** 2026-12-01 → "1 de diciembre de 2026". */
-export function longDate(isoDate: string): string {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  return `${day} de ${MONTHS[(month ?? 1) - 1]} de ${year}`;
 }
 
 /** Dirección que lleva el QR: cualquiera puede abrirla para comprobar que el recibo es auténtico. */
