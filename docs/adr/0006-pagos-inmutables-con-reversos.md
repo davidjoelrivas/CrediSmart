@@ -1,8 +1,9 @@
 # Hacer inmutables los pagos, asientos y auditoría con triggers de MySQL y corregir los errores con reversos en vez de editar o borrar registros
 
-- **Estado:** Aceptada, pendiente de implementar (Fase 1, requiere la base de datos)
+- **Estado:** Aceptada e implementada (2026-11-27)
 - **Fecha:** 2026-11-19
 - **ADR:** 0006
+- **Actualización (2026-11-27):** el motor es PostgreSQL y no MySQL. La decisión es la misma, pero PostgreSQL permite además seguridad por fila, que se activó en todas las tablas (migración 0005). Los triggers usan `RAISE EXCEPTION` en lugar de `SIGNAL SQLSTATE`.
 
 ## Contexto
 
@@ -41,4 +42,7 @@ MySQL no tiene seguridad por fila ni columnas de solo escritura. Una regla que s
 
 ## Evidencia
 
-Pendiente. Se agregará con la primera migración del esquema y con pruebas de integración contra MySQL real que comprueben que `UPDATE` y `DELETE` sobre estas tablas fallan y que un reverso deja el saldo correcto.
+- **Triggers:** `prevent_modification()` y los triggers `BEFORE UPDATE OR DELETE` de `payments`, `payment_allocations`, `receipts`, `journal_entries`, `journal_lines` y `audit_log` están en las migraciones `0003_collections.sql` y `0004_accounting_and_audit.sql`.
+- **Pruebas de integración contra PostgreSQL real:** `apps/api/src/integration/postgres-system.integration.test.ts` comprueba que `UPDATE` y `DELETE` sobre esas tablas fallan y que un reverso deja el saldo correcto.
+- **Contabilidad que siempre cuadra:** un trigger diferido rechaza cualquier asiento cuyos débitos y créditos no sean iguales.
+- **Bitácora encadenada:** cada registro guarda el hash del anterior; `GET /api/v1/audit` verifica la cadena y la pantalla de Bitácora avisa si se rompe.

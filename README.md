@@ -33,6 +33,7 @@ CrediSmart convierte ese proceso manual en un flujo de trabajo completo, y no so
 - Inicio de sesión, tablero, clientes, préstamos (nuevo, detalle, desembolso, cobro, reverso), cobranza con recordatorio por WhatsApp, simulador, solicitudes de precalificación, bitácora y equipo.
 - Página pública de **verificación de recibos** (`/verificar/…`) y **formulario público de solicitud** (`/aplicar/…`).
 - **Portal del cliente:** consulta de sus préstamos, cuotas y pagos.
+- **Instalable y con modo sin conexión (PWA):** abre sin internet y **los cobros hechos sin conexión se guardan en el equipo y se envían solos al volver la señal, sin duplicarse** ([ADR 0011](docs/adr/0011-cobros-sin-conexion-con-cola-e-idempotencia.md)). Limitación: solo se puede cobrar un préstamo que se abrió con conexión, y el recibo se emite al enviar.
 
 **API** (`apps/api`, Fastify, arquitectura hexagonal): sesiones seguras, roles (dueño, cobrador, contador, cliente), validación de todo lo que entra, límites de intentos, cabeceras de seguridad, cálculo automático de mora, PDF de recibo y de contrato/pagaré.
 
@@ -40,7 +41,7 @@ CrediSmart convierte ese proceso manual en un flujo de trabajo completo, y no so
 
 **Base de datos** (`db/migrations`, PostgreSQL con SQL escrito a mano, sin ORM): 8 migraciones versionadas; pagos, asientos y bitácora inmutables por triggers; seguridad por fila activada en todas las tablas; el DNI de los clientes se guarda **cifrado** (AES-256-GCM).
 
-**Pruebas:** 480 pruebas automáticas (209 de dominio, 205 de la API, 45 de integración contra PostgreSQL real, 13 de la web y 8 de contratos), incluidas pruebas de propiedades con fast-check y pruebas de concurrencia (dos cobros simultáneos con la misma clave no se duplican).
+**Pruebas:** 531 pruebas automáticas (209 de dominio, 219 de la API, 50 de integración contra PostgreSQL real, 45 de la web y 8 de contratos), incluidas pruebas de propiedades con fast-check, de concurrencia (dos cobros simultáneos con la misma clave no se duplican), de **acceso indebido entre organizaciones** y una **prueba de arquitectura** que hace cumplir los límites entre capas y módulos. Cobertura de líneas: dominio 98 %, API 91 % (solo unitarias), web 81 %, contratos 97 %.
 
 ## Cómo correrlo
 
@@ -104,7 +105,8 @@ docs/               Arquitectura (C4), decisiones (ADR) y operaciones
 | 1. Núcleo operativo | Esquema de datos, autenticación, clientes, préstamos, pagos, recibos, mora, tablero | Hecho |
 | 2. Documentos y flujo de solicitud | Contrato y pagaré, precalificación con enlace público, portal del cliente (consulta) | Hecho (el texto legal del contrato es un **borrador** pendiente de revisión por un abogado) |
 | 3. Producción | Despliegue en un solo servicio, base de datos en Supabase | Guía y Dockerfile listos |
-| 4. Pendiente | Modo sin conexión (PWA), reporte de pagos por el cliente desde su portal, conciliación bancaria, envío automático de mensajes por WhatsApp, integración continua | Planificado |
+| 4. Calidad y operación | Pruebas de arquitectura, integración continua con cobertura, exportación del modelo de datos, modo sin conexión para cobros | Hecho (el flujo de GitHub Actions se verá en su primera ejecución) |
+| 5. Pendiente | Lecturas sin conexión cifradas localmente, reporte de pagos por el cliente desde su portal, conciliación bancaria, envío automático de mensajes por WhatsApp | Planificado |
 
 ## Cómo contribuir y flujo de trabajo
 

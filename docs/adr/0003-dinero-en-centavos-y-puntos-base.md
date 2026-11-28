@@ -3,6 +3,7 @@
 - **Estado:** Aceptada e implementada en `packages/domain`
 - **Fecha:** 2026-11-19
 - **ADR:** 0003
+- **Actualización (2026-11-27):** el motor de base de datos finalmente es PostgreSQL y no MySQL. La decisión no cambia: el dinero sigue siendo un entero en centavos (`bigint`) y las tasas, enteros en puntos base. Donde este ADR dice "MySQL" léase "PostgreSQL"; el controlador `pg` devuelve `bigint` como texto, por lo que se convierte de forma explícita a número al leer.
 
 ## Contexto
 
